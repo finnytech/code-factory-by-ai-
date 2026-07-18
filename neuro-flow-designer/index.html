@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroFlow Designer - AI Swarm Visualizer & IDE</title>
+    <meta name="description" content="An interactive, high-fidelity visual designer and canvas sandbox for designing and simulating agentic AI swarms.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Main Header -->
+        <header id="main-header">
+            <div class="logo-area">
+                <span class="logo-glow"></span>
+                <span class="logo-icon">✦</span>
+                <h1>NeuroFlow <span class="accent-text">Designer</span></h1>
+                <span class="version-tag">v1.0.0</span>
+            </div>
+            
+            <div class="header-controls">
+                <div class="control-group">
+                    <label for="template-select">Presets</label>
+                    <select id="template-select" class="cyber-select">
+                        <option value="orchestrator">Orchestrator-Workers Swarm</option>
+                        <option value="sequential">Sequential Code Gen & Review</option>
+                        <option value="router">Dynamic Router & Tools</option>
+                        <option value="minimal">Blank Canvas</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="speed-select">Speed</label>
+                    <select id="speed-select" class="cyber-select">
+                        <option value="0.5">0.5x (Slow)</option>
+                        <option value="1" selected>1.0x (Normal)</option>
+                        <option value="2">2.0x (Fast)</option>
+                        <option value="5">5.0x (Turbo)</option>
+                    </select>
+                </div>
+
+                <div class="divider"></div>
+
+                <button id="btn-run" class="btn btn-primary" title="Start simulation">
+                    <span class="btn-icon">▶</span> Run Flow
+                </button>
+                <button id="btn-pause" class="btn btn-secondary" title="Pause simulation" disabled>
+                    <span class="btn-icon">⏸</span> Pause
+                </button>
+                <button id="btn-reset" class="btn btn-danger" title="Clear simulation state">
+                    <span class="btn-icon">↺</span> Reset
+                </button>
+            </div>
+
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-dot green-glow"></span>
+                    <span id="system-status-text">Ready</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Body Layout -->
+        <main id="workspace-layout">
+            <!-- Sidebar: Node Palette & Properties -->
+            <aside id="sidebar-left" class="workspace-panel">
+                <div class="panel-header">
+                    <h2>Node Library</h2>
+                </div>
+                
+                <!-- Draggable Node Templates -->
+                <div class="node-palette">
+                    <div class="palette-section">
+                        <h3>Agent Templates</h3>
+                        <div class="palette-items">
+                            <div class="palette-node node-type-agent" draggable="true" data-type="agent" data-role="planner">
+                                <span class="node-icon">🎯</span>
+                                <div class="palette-info">
+                                    <span class="name">Planner Agent</span>
+                                    <span class="desc">Breaks tasks into steps</span>
+                                </div>
+                            </div>
+                            <div class="palette-node node-type-agent" draggable="true" data-type="agent" data-role="coder">
+                                <span class="node-icon">💻</span>
+                                <div class="palette-info">
+                                    <span class="name">Coder Agent</span>
+                                    <span class="desc">Generates source code</span>
+                                </div>
+                            </div>
+                            <div class="palette-node node-type-agent" draggable="true" data-type="agent" data-role="critic">
+                                <span class="node-icon">🔍</span>
+                                <div class="palette-info">
+                                    <span class="name">Reviewer Agent</span>
+                                    <span class="desc">Reviews & corrects code</span>
+                                </div>
+                            </div>
+                            <div class="palette-node node-type-agent" draggable="true" data-type="agent" data-role="router">
+                                <span class="node-icon">🔀</span>
+                                <div class="palette-info">
+                                    <span class="name">Routing Agent</span>
+                                    <span class="desc">Routes based on prompt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="palette-section">
+                        <h3>Integration Tools</h3>
+                        <div class="palette-items">
+                            <div class="palette-node node-type-tool" draggable="true" data-type="tool" data-tool="web_search">
+                                <span class="node-icon">🌐</span>
+                                <div class="palette-info">
+                                    <span class="name">Web Search</span>
+                                    <span class="desc">Fetches online information</span>
+                                </div>
+                            </div>
+                            <div class="palette-node node-type-tool" draggable="true" data-type="tool" data-tool="code_executor">
+                                <span class="node-icon">⚙️</span>
+                                <div class="palette-info">
+                                    <span class="name">Code Compiler</span>
+                                    <span class="desc">Executes sandboxed scripts</span>
+                                </div>
+                            </div>
+                            <div class="palette-node node-type-tool" draggable="true" data-type="tool" data-tool="git_push">
+                                <span class="node-icon">📤</span>
+                                <div class="palette-info">
+                                    <span class="name">Git Publisher</span>
+                                    <span class="desc">Pushes project to GitHub</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Node Property Inspector -->
+                <div id="property-inspector" class="inspector-empty">
+                    <div class="panel-header border-top">
+                        <h2>Inspector</h2>
+                    </div>
+                    <div class="inspector-content">
+                        <p class="empty-state">Select a node to inspect and edit properties.</p>
+                        <form id="property-form" style="display: none;">
+                            <input type="hidden" id="prop-node-id">
+                            <div class="form-group">
+                                <label for="prop-name">Node Name</label>
+                                <input type="text" id="prop-name" class="cyber-input">
+                            </div>
+                            
+                            <!-- Dynamic Agent inputs -->
+                            <div class="agent-only-fields">
+                                <div class="form-group">
+                                    <label for="prop-model">Model</label>
+                                    <select id="prop-model" class="cyber-select">
+                                        <option value="gemini-3.5-pro">Gemini 3.5 Pro</option>
+                                        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                                        <option value="custom-swarm-agent">Custom Swarm Node</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="prop-prompt">System Instruction</label>
+                                    <textarea id="prop-prompt" class="cyber-textarea" rows="4"></textarea>
+                                </div>
+                                <div class="form-group slider-group">
+                                    <label for="prop-temp">Temperature: <span id="temp-val">0.7</span></label>
+                                    <input type="range" id="prop-temp" min="0" max="2" step="0.1" value="0.7">
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Tool inputs -->
+                            <div class="tool-only-fields" style="display: none;">
+                                <div class="form-group">
+                                    <label for="prop-tool-param">Parameter Query</label>
+                                    <input type="text" id="prop-tool-param" class="cyber-input" placeholder="e.g. main.py contents">
+                                </div>
+                            </div>
+
+                            <button type="button" id="btn-save-properties" class="btn btn-secondary btn-full">Save Configuration</button>
+                        </form>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center Panel: Grid Editor & Arena Views -->
+            <section id="workspace-center">
+                <!-- Tab Controls -->
+                <div class="workspace-tabs">
+                    <button class="tab-btn active" data-target="flow-editor-panel">
+                        <span class="tab-icon">⚙️</span> Flow Editor
+                    </button>
+                    <button class="tab-btn" data-target="swarm-arena-panel">
+                        <span class="tab-icon">🪐</span> Swarm Arena 2D
+                    </button>
+                </div>
+
+                <!-- Flow Editor View -->
+                <div id="flow-editor-panel" class="tab-panel active">
+                    <div id="flow-editor-container" class="editor-grid">
+                        <!-- SVG Layer for Links -->
+                        <svg id="svg-connections-layer">
+                            <defs>
+                                <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--color-primary-glow)" />
+                                </marker>
+                                <linearGradient id="connection-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="var(--color-primary)" />
+                                    <stop offset="100%" stop-color="var(--color-secondary)" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        
+                        <!-- Nodes will be dynamically spawned here -->
+                        <div id="nodes-canvas"></div>
+                    </div>
+                </div>
+
+                <!-- Swarm Arena View -->
+                <div id="swarm-arena-panel" class="tab-panel">
+                    <div class="canvas-header-overlay">
+                        <div class="arena-legend">
+                            <span class="legend-item"><span class="legend-dot planner"></span> Planner</span>
+                            <span class="legend-item"><span class="legend-dot coder"></span> Coder</span>
+                            <span class="legend-item"><span class="legend-dot critic"></span> Reviewer</span>
+                            <span class="legend-item"><span class="legend-dot task"></span> Task Token</span>
+                        </div>
+                        <div class="arena-stats">
+                            <span>Active Swarm Particles: <strong id="arena-active-count">0</strong></span>
+                        </div>
+                    </div>
+                    <canvas id="swarm-canvas"></canvas>
+                </div>
+            </section>
+
+            <!-- Right Panel: System Diagnostics & Logs -->
+            <aside id="sidebar-right" class="workspace-panel">
+                <!-- System Dashboard Metrics -->
+                <div class="panel-header">
+                    <h2>Live Dashboard</h2>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <span class="label">Tokens/Sec</span>
+                        <span class="val green-text" id="metric-tps">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="label">Accumulated Cost</span>
+                        <span class="val purple-text" id="metric-cost">$0.000</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="label">Avg Latency</span>
+                        <span class="val orange-text" id="metric-latency">0ms</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="label">Execution Queue</span>
+                        <span class="val blue-text" id="metric-queue">0</span>
+                    </div>
+                </div>
+
+                <!-- Execution Terminal Console -->
+                <div class="panel-header border-top">
+                    <h2>Debug Terminal</h2>
+                    <button id="btn-clear-logs" class="btn btn-link">Clear</button>
+                </div>
+                <div class="console-wrapper">
+                    <div id="console-logs">
+                        <div class="console-line system-line">[SYSTEM] Terminal initialized. Load templates to begin.</div>
+                    </div>
+                </div>
+
+                <!-- Graphing Chart Visualizer -->
+                <div class="panel-header border-top">
+                    <h2>Workflow Performance</h2>
+                </div>
+                <div class="chart-container">
+                    <div class="performance-chart">
+                        <!-- Custom styled bars indicating performance output -->
+                        <div class="bar-col"><div class="bar-val" style="height: 20%;" id="chart-bar-0"></div><span class="bar-lbl">Plan</span></div>
+                        <div class="bar-col"><div class="bar-val" style="height: 45%;" id="chart-bar-1"></div><span class="bar-lbl">Code</span></div>
+                        <div class="bar-col"><div class="bar-val" style="height: 75%;" id="chart-bar-2"></div><span class="bar-lbl">Rev</span></div>
+                        <div class="bar-col"><div class="bar-val" style="height: 30%;" id="chart-bar-3"></div><span class="bar-lbl">Test</span></div>
+                        <div class="bar-col"><div class="bar-val" style="height: 90%;" id="chart-bar-4"></div><span class="bar-lbl">Pub</span></div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Script imports -->
+    <script src="arena.js"></script>
+    <script src="simulation.js"></script>
+    <script src="editor.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
