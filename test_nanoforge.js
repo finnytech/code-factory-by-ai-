@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 
 (async () => {
-  console.log("Starting NanoForge Automated Integration Test...");
+  console.log("Starting NanoForge Automated Integration Test (Iteration 1)...");
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
@@ -27,12 +27,28 @@ const path = require('path');
 
   await page.goto(fileUrl);
   
-  // Wait for simulation initialization and canvas startup
+  // Wait for simulation initialization
   await page.waitForTimeout(2000);
 
   // Capture baseline screenshot
   await page.screenshot({ path: 'nanoforge-nanotech-simulator/nanoforge_sim.png' });
   console.log("Baseline screenshot captured.");
+
+  // Test DNA Presets Dropdown Selector
+  console.log("Verifying DNA Presets drop-down interaction...");
+  await page.selectOption('#preset-selector', 'hunter');
+  await page.waitForTimeout(500);
+
+  const editorValue = await page.inputValue('#dna-editor');
+  if (editorValue.includes('"maxSpeed": 3.4') || editorValue.includes('3.4')) {
+    console.log("Preset updated editor value successfully.");
+  } else {
+    errors.push("Preset selector failed to update DNA editor content.");
+  }
+
+  // Click compiling
+  await page.click('#btn-apply-dna');
+  await page.waitForTimeout(500);
 
   // Test button clicks
   console.log("Clicking SPAWN NANOBOT button...");
@@ -43,9 +59,18 @@ const path = require('path');
   await page.click('#btn-mutagenic-storm');
   await page.waitForTimeout(1000);
 
+  // Click obstacles brush and paint on coordinates
+  console.log("Selecting obstacles brush...");
+  await page.click('#btn-spray-obstacle');
+  await page.mouse.move(400, 250);
+  await page.mouse.down();
+  await page.mouse.move(450, 250);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+
   // Capture mutated screenshot
   await page.screenshot({ path: 'nanoforge-nanotech-simulator/nanoforge_mutated.png' });
-  console.log("Mutagenic pulse screenshot captured.");
+  console.log("Mutagenic & obstacles screenshot captured.");
 
   // Retrieve current stats from DOM
   const botCount = await page.textContent('#nanobot-count');

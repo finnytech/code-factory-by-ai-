@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Quantum Key Distribution (QKD) Simulator & Visualizer. Explore physical models: attenuation, WCP multi-photon states, PNS attack, decoy states, and live key rate charts.">
-    <title>Quantum Cryptography Lab — BB84 Physical QKD Simulator</title>
+    <title>Quantum Cryptography Lab — BB84, B92 & SARG04 Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,6 +25,16 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neon-cyan);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     Simulation Controls
                 </h2>
+
+                <!-- NEW: QKD Protocol Dropdown Selector -->
+                <div class="control-group">
+                    <label for="protocol-select">QKD Protocol</label>
+                    <select id="protocol-select" class="form-select">
+                        <option value="BB84" selected>BB84 (4-State Protocol)</option>
+                        <option value="B92">B92 (2-State Protocol)</option>
+                        <option value="SARG04">SARG04 (Attn-Resistant)</option>
+                    </select>
+                </div>
                 
                 <div class="control-group">
                     <label for="key-length-slider">
@@ -42,7 +52,7 @@
                     <input type="range" id="noise-slider" min="0" max="10" step="1" value="2">
                 </div>
 
-                <!-- NEW: Fiber Link Distance -->
+                <!-- Fiber Link Distance -->
                 <div class="control-group">
                     <label for="distance-slider">
                         <span>Fiber Link Distance</span>
@@ -51,7 +61,7 @@
                     <input type="range" id="distance-slider" min="0" max="120" step="5" value="40">
                 </div>
 
-                <!-- NEW: Light Source Mode -->
+                <!-- Light Source Mode -->
                 <div class="control-group">
                     <label for="source-mode-select">Light Source Mode</label>
                     <select id="source-mode-select" class="form-select">
@@ -60,7 +70,7 @@
                     </select>
                 </div>
 
-                <!-- NEW: Mean Photon Number (mu) -->
+                <!-- Mean Photon Number (mu) -->
                 <div class="control-group" id="mu-container">
                     <label for="mu-slider">
                         <span>Mean Photon Number (μ)</span>
@@ -69,7 +79,7 @@
                     <input type="range" id="mu-slider" min="0.1" max="1.0" step="0.05" value="0.5">
                 </div>
 
-                <!-- NEW: Decoy States Protocol -->
+                <!-- Decoy States Protocol -->
                 <div class="switch-control" id="decoy-container">
                     <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">Decoy State Protocol</span>
                     <label class="switch">
@@ -89,7 +99,7 @@
                     </label>
                 </div>
 
-                <!-- NEW: Eavesdropper Strategy -->
+                <!-- Eavesdropper Strategy -->
                 <div class="control-group" id="eve-strategy-container">
                     <label for="eve-strategy-select">Eavesdropper Strategy</label>
                     <select id="eve-strategy-select" class="form-select">
@@ -104,6 +114,40 @@
 
             <!-- Workspace -->
             <div>
+                <!-- NEW: Interactive Laboratory Challenges Widget -->
+                <div class="glass-card" style="padding: 1.25rem; margin-bottom: 1.5rem;" id="challenges-card">
+                    <h3 class="card-title" style="font-size: 1.1rem; margin-bottom: 0.75rem; border-bottom: none; padding-bottom: 0;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neon-cyan);"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                        Interactive QKD Lab Challenges
+                    </h3>
+                    <div class="challenges-grid">
+                        <div class="challenge-item" id="challenge-1">
+                            <div class="challenge-header">
+                                <span class="challenge-title">1. Decoy State Shield</span>
+                                <span class="challenge-badge badge-locked" id="badge-c1">Incomplete</span>
+                            </div>
+                            <p class="challenge-desc">Extract a secure key at <b>50+ km</b> distance under active <b>PNS</b> eavesdropping.</p>
+                            <button class="btn-challenge" id="btn-activate-c1">Activate Mission</button>
+                        </div>
+                        <div class="challenge-item" id="challenge-2">
+                            <div class="challenge-header">
+                                <span class="challenge-title">2. Stealthy Intruder</span>
+                                <span class="challenge-badge badge-locked" id="badge-c2">Incomplete</span>
+                            </div>
+                            <p class="challenge-desc">Play as Eve: Read at least <b>15 bits</b> of key data, but keep QBER below <b>11%</b>.</p>
+                            <button class="btn-challenge" id="btn-activate-c2">Activate Mission</button>
+                        </div>
+                        <div class="challenge-item" id="challenge-3">
+                            <div class="challenge-header">
+                                <span class="challenge-title">3. B92 Protocol Match</span>
+                                <span class="challenge-badge badge-locked" id="badge-c3">Incomplete</span>
+                            </div>
+                            <p class="challenge-desc">Calibrate and successfully run a <b>B92</b> transmission yielding a secure key.</p>
+                            <button class="btn-challenge" id="btn-activate-c3">Activate Mission</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Wizard Steps Indicator -->
                 <div class="wizard-steps">
                     <div class="step active" id="step-0" data-step="0">
@@ -143,7 +187,7 @@
                         </div>
                     </div>
 
-                    <!-- NEW: Secure Key Rate Chart -->
+                    <!-- Key Rate Chart -->
                     <div class="glass-card" style="padding: 1rem;">
                         <h3 class="card-title" style="font-size: 1.1rem; margin-bottom: 0.75rem; border-bottom: none; padding-bottom: 0;">
                             Key Rate vs Distance (Physics Link Chart)
@@ -204,6 +248,7 @@
                                 <th>Alice Bit</th>
                                 <th>Alice Basis</th>
                                 <th>Polarization</th>
+                                <th>SARG Set / B92 State</th> <!-- SARG / B92 description -->
                                 <th class="eve-col">Eve Basis</th>
                                 <th class="eve-col">Eve Bit</th>
                                 <th>Bob Basis</th>
@@ -214,7 +259,7 @@
                         </thead>
                         <tbody id="state-table-body">
                             <tr>
-                                <td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">No simulation data available. Click "Run Full Simulation" to generate states.</td>
+                                <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">No simulation data available. Click "Run Full Simulation" to generate states.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -233,7 +278,7 @@
                     <div style="width: 42px;"></div>
                 </div>
                 <div class="terminal-body" id="terminal-console">
-                    <div class="log-line"><span>[11:30:00]</span> Physical Quantum Cryptography Lab active. Poisson coherent laser sources calibrated.</div>
+                    <div class="log-line"><span>[12:00:00]</span> Physical Quantum Cryptography Lab active. Poisson coherent laser sources calibrated.</div>
                 </div>
             </div>
 

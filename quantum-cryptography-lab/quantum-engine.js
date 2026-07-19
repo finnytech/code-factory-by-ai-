@@ -1,5 +1,5 @@
 /**
- * Quantum Cryptography Engine - BB84 & Physics Link Simulator
+ * Quantum Cryptography Engine - BB84, B92, & SARG04 Protocols
  * Implements physical models: attenuation, WCP multi-photon pulses, PNS attack, decoy states.
  */
 
@@ -19,6 +19,12 @@ const PULSE_STATES = {
     SIGNAL: 'SIGNAL',
     DECOY: 'DECOY',
     VACUUM: 'VACUUM'
+};
+
+const PROTOCOLS = {
+    BB84: 'BB84',
+    B92: 'B92',
+    SARG04: 'SARG04'
 };
 
 class QuantumPhoton {
@@ -78,10 +84,13 @@ class QKDModule {
 
     reset() {
         this.keyLength = 100;
-        this.noiseLevel = 0.02; // 2% intrinsic channel error (alignment error)
+        this.noiseLevel = 0.02; // intrinsic alignment error
         this.evePresent = false;
         this.eveStrategy = 'intercept_resend'; // 'intercept_resend' or 'pns'
         
+        // Protocol
+        this.protocol = PROTOCOLS.BB84;
+
         // Physics Link Parameters
         this.distance = 40;            // Link distance in km
         this.fiberAttenuation = 0.2;  // dB/km (standard SMF at 1550nm)
@@ -97,6 +106,7 @@ class QKDModule {
         this.aliceBits = [];
         this.aliceBases = [];
         this.alicePhotons = [];        // Representation of states prepared
+        this.sargAnnouncements = [];   // SARG04 state pair announcements
 
         // Eve's interception tracking
         this.eveBases = [];
@@ -132,10 +142,11 @@ class QKDModule {
         this.alicePhotons = [];
         this.pulseStates = [];
         this.photonCounts = [];
+        this.sargAnnouncements = [];
         
         for (let i = 0; i < length; i++) {
             const bit = Math.random() < 0.5 ? 0 : 1;
-            const basis = Math.random() < 0.5 ? BASES.RECTILINEAR : BASES.DIAGONAL;
+            let basis = Math.random() < 0.5 ? BASES.RECTILINEAR : BASES.DIAGONAL;
             
             // Decoy State assignments
             let pulseState = PULSE_STATES.SIGNAL;
@@ -145,13 +156,13 @@ class QKDModule {
                 const rand = Math.random();
                 if (rand < 0.6) {
                     pulseState = PULSE_STATES.SIGNAL;
-                    mu = this.meanPhotonNumber; // signal mean
+                    mu = this.meanPhotonNumber;
                 } else if (rand < 0.9) {
                     pulseState = PULSE_STATES.DECOY;
-                    mu = 0.1; // decoy mean
+                    mu = 0.1;
                 } else {
                     pulseState = PULSE_STATES.VACUUM;
-                    mu = 0.0; // vacuum mean
+                    mu = 0.0;
                 }
             }
             
@@ -164,11 +175,33 @@ class QKDModule {
             this.pulseStates.push(pulseState);
             this.photonCounts.push(count);
             this.aliceBits.push(bit);
+            
+            let photon;
+            if (this.protocol === PROTOCOLS.B92) {
+                // B92: Bit 0 is horizontal (rect), Bit 1 is diagonal 45 (diag)
+                basis = (bit === 0) ? BASES.RECTILINEAR : BASES.DIAGONAL;
+                photon = new QuantumPhoton(0, basis); // Alice encodes into H or D (bit 0 inside basis)
+            } else {
+                // BB84 / SARG04
+                photon = new QuantumPhoton(bit, basis);
+            }
+            
             this.aliceBases.push(basis);
-            this.alicePhotons.push(new QuantumPhoton(bit, basis));
+            this.alicePhotons.push(photon);
+
+            // SARG04 Announcements: Announce state pairs containing the state
+            if (this.protocol === PROTOCOLS.SARG04) {
+                const state = photon.polarization;
+                if (state === POLARIZATIONS.HORIZONTAL) this.sargAnnouncements.push('{H, D}');
+                else if (state === POLARIZATIONS.VERTICAL) this.sargAnnouncements.push('{V, A}');
+                else if (state === POLARIZATIONS.DIAGONAL_45) this.sargAnnouncements.push('{D, V}');
+                else if (state === POLARIZATIONS.DIAGONAL_135) this.sargAnnouncements.push('{A, H}');
+            } else {
+                this.sargAnnouncements.push('-');
+            }
         }
         
-        this.log(`Alice generated ${length} pulses (${this.lightSourceMode.toUpperCase()}). Decoy state: ${this.decoyStatesEnabled ? 'ON' : 'OFF'}.`);
+        this.log(`Alice generated ${length} pulses (${this.protocol}, ${this.lightSourceMode.toUpperCase()}).`);
     }
 
     transmitPhotons() {
@@ -186,7 +219,6 @@ class QKDModule {
 
         for (let i = 0; i < this.alicePhotons.length; i++) {
             const photonCount = this.photonCounts[i];
-            const pulseState = this.pulseStates[i];
             let photon = this.alicePhotons[i];
             
             let eveLearned = 0;
@@ -197,20 +229,27 @@ class QKDModule {
             // 1. Eavesdropping simulation
             if (this.evePresent) {
                 if (this.eveStrategy === 'pns' && this.lightSourceMode === 'wcp' && photonCount > 1) {
-                    // PNS Attack: Eve splits off 1 photon, stores it. Sends rest to Bob undisturbed.
-                    // Eve learns the bit with 100% accuracy after bases sifting.
                     eveLearned = 1;
                     eveB = 'Split';
-                    eveBit = photon.bit;
+                    eveBit = this.aliceBits[i];
                     finalPhoton = photon; // Bob gets original state undisturbed
                 } else {
-                    // Intercept-Resend Attack (on single photon pulses or standard IR strategy)
+                    // Intercept-Resend Attack
                     if (photonCount > 0) {
                         eveB = Math.random() < 0.5 ? BASES.RECTILINEAR : BASES.DIAGONAL;
                         const measurement = photon.measure(eveB);
                         eveBit = measurement.bit;
                         finalPhoton = measurement.collapsedPhoton;
-                        eveLearned = (eveB === photon.basis) ? 1 : 0;
+                        
+                        // Check if Eve learns the bit
+                        if (this.protocol === PROTOCOLS.B92) {
+                            // In B92, Eve only learns the bit if she gets a click in the opposite basis
+                            if (eveB === BASES.RECTILINEAR && eveBit === 1) eveLearned = 1;
+                            else if (eveB === BASES.DIAGONAL && eveBit === 1) eveLearned = 1;
+                        } else {
+                            // BB84 / SARG04
+                            eveLearned = (eveB === photon.basis) ? 1 : 0;
+                        }
                     }
                 }
             }
@@ -219,28 +258,21 @@ class QKDModule {
             this.eveMeasuredBits.push(eveBit);
             this.eveLearnedInfo.push(eveLearned);
 
-            // 2. Transmission through fiber and Bob's detection
-            // Probability that at least one photon is detected by Bob:
+            // 2. Bob's detection
             const detectProb = 1 - Math.pow(1 - overallT, photonCount);
-            // Click probability including dark count
             const clickProb = detectProb + this.darkCountRate - (detectProb * this.darkCountRate);
             
             const bobBasis = Math.random() < 0.5 ? BASES.RECTILINEAR : BASES.DIAGONAL;
             this.bobBases.push(bobBasis);
 
             if (Math.random() < clickProb) {
-                // Bob's detector clicked!
                 this.bobClicks.push(true);
-                
-                // Was it a dark count or actual photon detection?
                 const isDarkCount = (photonCount === 0 || Math.random() < (this.darkCountRate / clickProb));
                 
                 if (isDarkCount) {
-                    // Random measurement due to thermal noise dark count
                     this.bobMeasuredBits.push(Math.random() < 0.5 ? 0 : 1);
                 } else {
                     // Actual photon measurement
-                    // Intrinsic alignment error rotation check
                     let measuredPhoton = finalPhoton;
                     if (Math.random() < this.noiseLevel) {
                         measuredPhoton = new QuantumPhoton(finalPhoton.bit === 0 ? 1 : 0, finalPhoton.basis);
@@ -249,14 +281,13 @@ class QKDModule {
                     this.bobMeasuredBits.push(bobMeasurement.bit);
                 }
             } else {
-                // Bob's detector registered no click (absorption / loss)
                 this.bobClicks.push(false);
                 this.bobMeasuredBits.push(null);
             }
         }
         
         const receivedCount = this.bobClicks.filter(c => c).length;
-        this.log(`Transmission complete. Bob received ${receivedCount}/${this.alicePhotons.length} clicks (Loss: ${(100 - (receivedCount / this.alicePhotons.length) * 100).toFixed(1)}%).`);
+        this.log(`Transmission complete. Bob received ${receivedCount} clicks.`);
     }
 
     siftKeys() {
@@ -265,18 +296,63 @@ class QKDModule {
         this.siftedKeyBob = [];
 
         for (let i = 0; i < this.keyLength; i++) {
-            // Keep keys only if Bob received a click AND bases match
-            if (this.bobClicks[i] && this.aliceBases[i] === this.bobBases[i]) {
-                // In decoy states, keep only SIGNAL state for key extraction (standard configuration)
+            if (!this.bobClicks[i]) continue;
+            
+            let match = false;
+            let decodedBit = null;
+            
+            if (this.protocol === PROTOCOLS.BB84) {
+                match = (this.aliceBases[i] === this.bobBases[i]);
+                decodedBit = this.bobMeasuredBits[i];
+            } else if (this.protocol === PROTOCOLS.B92) {
+                const basis = this.bobBases[i];
+                const rawBit = this.bobMeasuredBits[i];
+                
+                if (basis === BASES.RECTILINEAR && rawBit === 1) {
+                    match = true;
+                    decodedBit = 1;
+                } else if (basis === BASES.DIAGONAL && rawBit === 1) {
+                    match = true;
+                    decodedBit = 0;
+                }
+            } else if (this.protocol === PROTOCOLS.SARG04) {
+                const basis = this.bobBases[i];
+                const rawBit = this.bobMeasuredBits[i];
+                const aliceState = this.alicePhotons[i].polarization;
+                
+                if (aliceState === POLARIZATIONS.HORIZONTAL) {
+                    if (basis === BASES.DIAGONAL && rawBit === 1) {
+                        match = true;
+                        decodedBit = 0;
+                    }
+                } else if (aliceState === POLARIZATIONS.VERTICAL) {
+                    if (basis === BASES.DIAGONAL && rawBit === 0) {
+                        match = true;
+                        decodedBit = 1;
+                    }
+                } else if (aliceState === POLARIZATIONS.DIAGONAL_45) {
+                    if (basis === BASES.RECTILINEAR && rawBit === 0) {
+                        match = true;
+                        decodedBit = 0;
+                    }
+                } else if (aliceState === POLARIZATIONS.DIAGONAL_135) {
+                    if (basis === BASES.RECTILINEAR && rawBit === 1) {
+                        match = true;
+                        decodedBit = 1;
+                    }
+                }
+            }
+
+            if (match) {
                 if (!this.decoyStatesEnabled || this.pulseStates[i] === PULSE_STATES.SIGNAL) {
                     this.siftedIndices.push(i);
                     this.siftedKeyAlice.push(this.aliceBits[i]);
-                    this.siftedKeyBob.push(this.bobMeasuredBits[i]);
+                    this.siftedKeyBob.push(decodedBit);
                 }
             }
         }
         
-        this.log(`Key sifting completed. Sifted Key Length: ${this.siftedIndices.length}.`);
+        this.log(`Key sifting completed. Protocol: ${this.protocol}. Sifted Key Length: ${this.siftedIndices.length}.`);
     }
 
     estimateErrorAndCorrect() {
@@ -286,7 +362,6 @@ class QKDModule {
             return;
         }
 
-        // Alice and Bob compare a subset of the sifted key (e.g., 30%) to estimate QBER
         const sampleSize = Math.max(1, Math.floor(this.siftedIndices.length * 0.3));
         let mismatches = 0;
 
@@ -297,29 +372,24 @@ class QKDModule {
         }
 
         this.qber = mismatches / sampleSize;
-        this.log(`QBER: ${(this.qber * 100).toFixed(1)}% (Estimated from ${sampleSize} bits).`);
+        this.log(`QBER: ${(this.qber * 100).toFixed(1)}% (Protocol: ${this.protocol}).`);
 
-        // Discard compared sample bits
         const remainingKeyAlice = this.siftedKeyAlice.slice(sampleSize);
         const remainingKeyBob = this.siftedKeyBob.slice(sampleSize);
 
-        // Security cutoff: Shor-Preskill secure key generation requires QBER <= 11% (or slightly higher with correction)
-        // With PNS attack, if Decoy states are not on, Eve knows almost all bits even if QBER is low.
-        // We simulate this security threat:
         let isCompromised = false;
         
-        // Under PNS attack on WCP, if decoy states are OFF, the secure key is fully compromised
-        // because Eve selectively intercepts without introducing errors.
+        // Under PNS attack on WCP, if decoy states are OFF, the secure key is fully compromised for BB84/B92.
+        // SARG04 has a slightly higher resistance, but we still consider it compromised without decoys at high distance.
         if (this.evePresent && this.eveStrategy === 'pns' && this.lightSourceMode === 'wcp' && !this.decoyStatesEnabled) {
             isCompromised = true;
-            this.log("CRITICAL SECURITY ALERT: Photon Number Splitting attack detected. Without decoy states, Eve knows the key while QBER remains low!");
+            this.log("CRITICAL SECURITY ALERT: PNS attack detected. Without decoy states, the key is fully compromised!");
         }
 
         if (this.qber > 0.11 || isCompromised) {
-            this.log("Security threshold breached! Key compromised. Entire key discarded.", "error");
+            this.log("Security threshold breached. Entire key discarded.", "error");
             this.secureKey = [];
         } else {
-            // Reconcile remaining bits (simulation of error correction)
             this.secureKey = [...remainingKeyAlice];
             this.log(`Key reconciled. Reconciled key: ${this.secureKey.length} bits.`);
         }
@@ -331,16 +401,11 @@ class QKDModule {
             return;
         }
 
-        // Privacy amplification cuts key down to squash Eve's info
-        // We simulate the reduction ratio based on the estimated QBER.
-        // Secure key fraction = 1 - 2*H_2(QBER)
         const compressionRatio = Math.max(0.1, 1 - 2 * binaryEntropy(this.qber));
         const finalLength = Math.max(1, Math.floor(this.secureKey.length * compressionRatio));
         
-        // Simulating hash compression
         const amplified = [];
         for (let i = 0; i < finalLength; i++) {
-            // XOR folding blocks to compress key
             const blockIndex = Math.floor(this.secureKey.length / finalLength) * i;
             let val = this.secureKey[blockIndex];
             if (blockIndex + 1 < this.secureKey.length) val ^= this.secureKey[blockIndex + 1];
@@ -348,16 +413,9 @@ class QKDModule {
         }
         
         this.secureKey = amplified;
-        this.log(`Privacy amplification complete. Secure key: ${this.secureKey.length} bits (Compression: ${(compressionRatio*100).toFixed(0)}%).`);
+        this.log(`Privacy amplification complete. Secure key: ${this.secureKey.length} bits.`);
     }
 
-    /**
-     * Compute secure key rate R vs Distance curves for plotting.
-     * Calculates three curves based on physics models:
-     * 1. Ideal Single Photon
-     * 2. WCP (no decoy states)
-     * 3. WCP (decoy states enabled)
-     */
     calculateTheoreticalKeyRates(distances = Array.from({length: 31}, (_, i) => i * 5)) {
         const rates = {
             distances: distances,
@@ -370,42 +428,43 @@ class QKDModule {
         const p_d = this.darkCountRate;
         const alpha = this.fiberAttenuation;
         const mu = this.meanPhotonNumber;
-        const e_det = this.noiseLevel; // intrinsic alignment error
+        const e_det = this.noiseLevel;
+
+        // Protocol multipliers (sifting factor)
+        // BB84 keeps 50% of matching bases.
+        // B92 keeps 25% of click-sift matches.
+        // SARG04 keeps 25% of conclusive pairs.
+        let siftFactor = 0.5;
+        if (this.protocol === PROTOCOLS.B92 || this.protocol === PROTOCOLS.SARG04) {
+            siftFactor = 0.25;
+        }
 
         distances.forEach(d => {
             const channelT = Math.pow(10, -(alpha * d) / 10);
             const eta = channelT * eta_b;
 
-            // 1. Ideal Single Photon Rate
-            // Yield Y_1 = eta + p_d
-            // Error E_1 = (eta * e_det + p_d * 0.5) / Y_1
+            // 1. Ideal Single Photon
             const Y_1_ideal = eta + p_d - eta * p_d;
             const E_1_ideal = (eta * e_det + p_d * 0.5) / Y_1_ideal;
-            const R_ideal = 0.5 * Y_1_ideal * (1 - 2 * binaryEntropy(E_1_ideal));
+            const R_ideal = siftFactor * Y_1_ideal * (1 - 2 * binaryEntropy(E_1_ideal));
             rates.ideal.push(Math.max(0, R_ideal));
 
-            // 2. WCP without Decoy States (PNS Attack vulnerability)
-            // Under PNS, Bob's total gain is Q_mu = 1 - e^(-mu * eta) + p_d
-            // Multi-photon fraction P_multi = 1 - e^(-mu) - mu * e^(-mu)
-            // Under PNS, Eve can intercept all multi-photon pulses. Alice and Bob must discard
-            // keys from multi-photons, which means key rate drops to 0 when Q_mu <= P_multi.
+            // 2. WCP without Decoy
             const Q_mu = (1 - Math.exp(-mu * eta)) + p_d;
             const E_mu = (e_det * (1 - Math.exp(-mu * eta)) + p_d * 0.5) / Q_mu;
             const P_multi = 1 - Math.exp(-mu) * (1 + mu);
             
             const Y_1_no_decoy = Math.max(0, Q_mu - P_multi);
-            const E_1_no_decoy = E_mu; // assume single-photon error is similar to total error
+            const E_1_no_decoy = E_mu;
             
-            const R_no_decoy = 0.5 * (Y_1_no_decoy * (1 - binaryEntropy(E_1_no_decoy)) - Q_mu * 1.2 * binaryEntropy(E_mu));
+            const R_no_decoy = siftFactor * (Y_1_no_decoy * (1 - binaryEntropy(E_1_no_decoy)) - Q_mu * 1.2 * binaryEntropy(E_mu));
             rates.wcpNoDecoy.push(Math.max(0, R_no_decoy));
 
-            // 3. WCP with Decoy States (Signal + Decoy protocol)
-            // Decoy states estimate Y_1 and e_1 tightly.
-            // Y_1_decoy = (mu / (mu - nu)) * (Q_decoy * e^nu - Q_vac) ... we approximate:
-            const Y_1_decoy = eta * Math.exp(-mu); // yield of single photons
-            const e_1_decoy = (eta * e_det + p_d * 0.5) / (eta + p_d); // error rate of single photons
+            // 3. WCP with Decoy
+            const Y_1_decoy = eta * Math.exp(-mu);
+            const e_1_decoy = (eta * e_det + p_d * 0.5) / (eta + p_d);
             
-            const R_decoy = 0.5 * (mu * Math.exp(-mu) * Y_1_decoy * (1 - binaryEntropy(e_1_decoy)) - Q_mu * 1.2 * binaryEntropy(E_mu));
+            const R_decoy = siftFactor * (mu * Math.exp(-mu) * Y_1_decoy * (1 - binaryEntropy(e_1_decoy)) - Q_mu * 1.2 * binaryEntropy(E_mu));
             rates.wcpDecoy.push(Math.max(0, R_decoy));
         });
 
@@ -434,6 +493,7 @@ class QKDModule {
             eveBits: this.eveMeasuredBits,
             photonCounts: this.photonCounts,
             pulseStates: this.pulseStates,
+            sargAnnouncements: this.sargAnnouncements,
             siftedIndices: this.siftedIndices,
             qber: this.qber,
             finalKey: this.secureKey,
@@ -443,10 +503,11 @@ class QKDModule {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { QKDModule, BASES, POLARIZATIONS, PULSE_STATES, QuantumPhoton };
+    module.exports = { QKDModule, BASES, POLARIZATIONS, PULSE_STATES, PROTOCOLS, QuantumPhoton };
 } else {
     window.QKDModule = QKDModule;
     window.BASES = BASES;
     window.POLARIZATIONS = POLARIZATIONS;
     window.PULSE_STATES = PULSE_STATES;
+    window.PROTOCOLS = PROTOCOLS;
 }

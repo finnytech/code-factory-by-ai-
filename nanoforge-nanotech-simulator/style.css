@@ -20,6 +20,7 @@
     --glow-cyan-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
     --glow-pink-shadow: 0 0 10px rgba(255, 0, 127, 0.5);
     --glow-green-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+    --glow-gold-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
 }
 
 /* RESET & BASE */
@@ -134,7 +135,7 @@ main {
     grid-template-columns: 320px 1fr 340px;
     gap: 15px;
     flex-grow: 1;
-    min-height: 0; /* Important for scroll sizing inside grid */
+    min-height: 0;
 }
 
 .panel {
@@ -198,6 +199,14 @@ main {
     gap: 8px;
 }
 
+.environmental-grid {
+    grid-template-columns: 1fr 1fr;
+}
+
+.btn-span-2 {
+    grid-column: span 2;
+}
+
 .btn {
     font-family: var(--font-heading);
     font-size: 0.7rem;
@@ -222,7 +231,7 @@ main {
     background: rgba(0, 240, 255, 0.05);
     color: var(--neon-cyan);
 }
-.btn-cyan:hover {
+.btn-cyan:hover, .btn-cyan.active-brush {
     background: rgba(0, 240, 255, 0.2);
     box-shadow: var(--glow-cyan-shadow);
 }
@@ -232,7 +241,7 @@ main {
     background: rgba(255, 0, 127, 0.05);
     color: var(--neon-pink);
 }
-.btn-pink:hover {
+.btn-pink:hover, .btn-pink.active-brush {
     background: rgba(255, 0, 127, 0.2);
     box-shadow: var(--glow-pink-shadow);
 }
@@ -261,28 +270,30 @@ main {
     border-color: rgba(0, 240, 255, 0.3);
     color: rgba(0, 240, 255, 0.8);
 }
-.btn-outline-cyan:hover {
+.btn-outline-cyan:hover, .btn-outline-cyan.active-brush {
     border-color: var(--neon-cyan);
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(0, 240, 255, 0.15);
+    box-shadow: var(--glow-cyan-shadow);
 }
 
 .btn-outline-pink {
     border-color: rgba(255, 0, 127, 0.3);
     color: rgba(255, 0, 127, 0.8);
 }
-.btn-outline-pink:hover {
+.btn-outline-pink:hover, .btn-outline-pink.active-brush {
     border-color: var(--neon-pink);
-    background: rgba(255, 0, 127, 0.1);
+    background: rgba(255, 0, 127, 0.15);
+    box-shadow: var(--glow-pink-shadow);
 }
 
 .btn-outline-gold {
     border-color: rgba(255, 170, 0, 0.3);
     color: var(--neon-gold);
 }
-.btn-outline-gold:hover {
+.btn-outline-gold:hover, .btn-outline-gold.active-brush {
     border-color: var(--neon-gold);
     background: rgba(255, 170, 0, 0.15);
-    box-shadow: 0 0 8px rgba(255, 170, 0, 0.3);
+    box-shadow: var(--glow-gold-shadow);
 }
 
 .btn-danger {
@@ -311,6 +322,33 @@ main {
     width: 100%;
     padding: 10px;
     margin-top: 5px;
+}
+
+/* DNA HEADER Presets Selector */
+.dna-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.preset-select {
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: bold;
+    background: #0d1426;
+    color: var(--neon-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-select:hover, .preset-select:focus {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 5px rgba(0, 240, 255, 0.2);
 }
 
 /* CODE EDITOR STYLING */
@@ -451,6 +489,7 @@ main {
 .bg-pink { background-color: var(--neon-pink); box-shadow: 0 0 4px var(--neon-pink); }
 .bg-green { background-color: var(--neon-green); box-shadow: 0 0 4px var(--neon-green); }
 .bg-blue { background-color: var(--neon-blue); box-shadow: 0 0 4px var(--neon-blue); }
+.bg-gold { background-color: var(--neon-gold); box-shadow: 0 0 4px var(--neon-gold); }
 .bg-cyan-glow { background: radial-gradient(circle, var(--neon-cyan) 0%, transparent 70%); }
 .bg-pink-glow { background: radial-gradient(circle, var(--neon-pink) 0%, transparent 70%); }
 
@@ -538,6 +577,6 @@ main {
         grid-template-columns: 1fr;
     }
     #control-panel {
-        max-height: 400px;
+        max-height: 480px;
     }
 }

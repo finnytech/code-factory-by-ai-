@@ -1,6 +1,6 @@
 /**
  * Quantum Cryptography Lab - Application Logic & Visualization
- * Binds QKD physical models to the GUI and renders animations & live charts.
+ * Binds QKD physical models and lab challenges to the GUI and renders animations & charts.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const eveToggle = document.getElementById('eve-toggle');
     const eveTag = document.getElementById('eve-tag');
     
-    // NEW DOM Elements - Physics Link Parameters
+    // Physics Link Parameters
+    const protocolSelect = document.getElementById('protocol-select');
     const distanceSlider = document.getElementById('distance-slider');
     const distanceVal = document.getElementById('distance-val');
     const sourceModeSelect = document.getElementById('source-mode-select');
@@ -28,6 +29,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const decoyContainer = document.getElementById('decoy-container');
     const eveStrategySelect = document.getElementById('eve-strategy-select');
     const eveStrategyContainer = document.getElementById('eve-strategy-container');
+    
+    // DOM Elements - Challenges
+    const btnActivateC1 = document.getElementById('btn-activate-c1');
+    const btnActivateC2 = document.getElementById('btn-activate-c2');
+    const btnActivateC3 = document.getElementById('btn-activate-c3');
+    
+    const challenge1Card = document.getElementById('challenge-1');
+    const challenge2Card = document.getElementById('challenge-2');
+    const challenge3Card = document.getElementById('challenge-3');
+    
+    const badgeC1 = document.getElementById('badge-c1');
+    const badgeC2 = document.getElementById('badge-c2');
+    const badgeC3 = document.getElementById('badge-c3');
     
     // DOM Elements - Wizard
     const steps = document.querySelectorAll('.step');
@@ -62,6 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let transmitterX, receiverX, middleY;
     let simulationResults = null;
     
+    // Challenge State
+    let activeChallenge = null; // 1, 2, or 3
+    let challengeStatuses = [false, false, false];
+    
     // Set Canvas Dimensions
     function resizeCanvas() {
         const rect = canvas.getBoundingClientRect();
@@ -84,6 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', resizeCanvas);
     
     // Control Event Listeners & UI Toggles
+    protocolSelect.addEventListener('change', (e) => {
+        qkd.protocol = e.target.value;
+        logConsole(`Protocol switched to ${qkd.protocol}.`);
+        drawChart();
+    });
+    
     keyLengthSlider.addEventListener('input', (e) => {
         keyLengthVal.textContent = e.target.value;
     });
@@ -110,18 +134,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mode === 'single_photon') {
             muContainer.style.display = 'none';
             decoyContainer.style.display = 'none';
-            logConsole("Laser source switched to Ideal Single Photon source.");
+            logConsole("Laser source set to Single Photon mode.");
         } else {
             muContainer.style.display = 'block';
             decoyContainer.style.display = 'flex';
-            logConsole("Laser source switched to Weak Coherent Pulses (Poisson model).");
+            logConsole("Laser source set to Coherent Pulse mode (WCP).");
         }
         drawChart();
     });
     
     decoyToggle.addEventListener('change', (e) => {
         qkd.decoyStatesEnabled = e.target.checked;
-        logConsole(`Decoy State protocol set to ${qkd.decoyStatesEnabled ? 'ENABLED' : 'DISABLED'}.`);
+        logConsole(`Decoy states: ${qkd.decoyStatesEnabled ? 'ENABLED' : 'DISABLED'}.`);
         drawChart();
     });
     
@@ -135,11 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     eveStrategySelect.addEventListener('change', (e) => {
         qkd.eveStrategy = e.target.value;
-        logConsole(`Eve strategy updated to: ${qkd.eveStrategy.toUpperCase()}`);
+        logConsole(`Eve strategy: ${qkd.eveStrategy.toUpperCase()}`);
     });
-    
-    // Initial UI updates
-    eveStrategyContainer.style.display = 'none';
     
     // Console logger
     function logConsole(message, type = 'info') {
@@ -156,48 +177,166 @@ document.addEventListener('DOMContentLoaded', () => {
         terminalConsole.scrollTop = terminalConsole.scrollHeight;
     }
     
+    // Challenge trigger activation
+    function activateChallenge(id) {
+        // Clear active
+        challenge1Card.classList.remove('active-mission');
+        challenge2Card.classList.remove('active-mission');
+        challenge3Card.classList.remove('active-mission');
+        
+        // Reset badges (except solved ones)
+        if (!challengeStatuses[0]) { badgeC1.className = 'challenge-badge badge-locked'; badgeC1.textContent = 'Incomplete'; }
+        if (!challengeStatuses[1]) { badgeC2.className = 'challenge-badge badge-locked'; badgeC2.textContent = 'Incomplete'; }
+        if (!challengeStatuses[2]) { badgeC3.className = 'challenge-badge badge-locked'; badgeC3.textContent = 'Incomplete'; }
+        
+        if (activeChallenge === id) {
+            // Toggle off
+            activeChallenge = null;
+            logConsole("Active mission cleared. Returning to free play mode.");
+            return;
+        }
+        
+        activeChallenge = id;
+        
+        if (id === 1) {
+            challenge1Card.classList.add('active-mission');
+            badgeC1.className = 'challenge-badge badge-active';
+            badgeC1.textContent = 'Active';
+            
+            // Set starting link parameters to guide the user
+            protocolSelect.value = 'BB84';
+            distanceSlider.value = 55;
+            distanceVal.textContent = '55 km';
+            sourceModeSelect.value = 'wcp';
+            muSlider.value = 0.5;
+            muVal.textContent = '0.5';
+            decoyToggle.checked = false; // user has to turn it ON to solve!
+            eveToggle.checked = true;
+            eveStrategySelect.value = 'pns';
+            
+            muContainer.style.display = 'block';
+            decoyContainer.style.display = 'flex';
+            eveTag.style.display = 'block';
+            eveStrategyContainer.style.display = 'block';
+            
+            logConsole("MISSION 1 ACTIVE: Protect QKD at 55km distance. Observe why key drops to 0 under PNS attack. Solve by enabling Decoy States!", "warning");
+        } else if (id === 2) {
+            challenge2Card.classList.add('active-mission');
+            badgeC2.className = 'challenge-badge badge-active';
+            badgeC2.textContent = 'Active';
+            
+            protocolSelect.value = 'BB84';
+            distanceSlider.value = 20;
+            distanceVal.textContent = '20 km';
+            sourceModeSelect.value = 'single_photon';
+            decoyToggle.checked = false;
+            eveToggle.checked = true;
+            eveStrategySelect.value = 'intercept_resend';
+            keyLengthSlider.value = 100;
+            keyLengthVal.textContent = '100';
+            
+            muContainer.style.display = 'none';
+            decoyContainer.style.display = 'none';
+            eveTag.style.display = 'block';
+            eveStrategyContainer.style.display = 'block';
+            
+            logConsole("MISSION 2 ACTIVE: Play as Eve. Eavesdrop on Alice/Bob to read >15 bits of data, but avoid raising QBER >= 11% (which would drop the key). Adjust parameters to solve!", "warning");
+        } else if (id === 3) {
+            challenge3Card.classList.add('active-mission');
+            badgeC3.className = 'challenge-badge badge-active';
+            badgeC3.textContent = 'Active';
+            
+            protocolSelect.value = 'B92';
+            distanceSlider.value = 30;
+            distanceVal.textContent = '30 km';
+            sourceModeSelect.value = 'single_photon';
+            decoyToggle.checked = false;
+            eveToggle.checked = false;
+            
+            muContainer.style.display = 'none';
+            decoyContainer.style.display = 'none';
+            eveTag.style.display = 'none';
+            eveStrategyContainer.style.display = 'none';
+            
+            logConsole("MISSION 3 ACTIVE: Generate a secure B92 key. Switch to B92 protocol and run the simulation to calibrate sifting constraints.", "warning");
+        }
+        
+        // Sync engine variables
+        qkd.protocol = protocolSelect.value;
+        qkd.distance = parseInt(distanceSlider.value);
+        qkd.lightSourceMode = sourceModeSelect.value;
+        qkd.meanPhotonNumber = parseFloat(muSlider.value);
+        qkd.decoyStatesEnabled = decoyToggle.checked;
+        qkd.evePresent = eveToggle.checked;
+        qkd.eveStrategy = eveStrategySelect.value;
+        qkd.keyLength = parseInt(keyLengthSlider.value);
+        
+        drawChart();
+    }
+    
+    btnActivateC1.addEventListener('click', () => activateChallenge(1));
+    btnActivateC2.addEventListener('click', () => activateChallenge(2));
+    btnActivateC3.addEventListener('click', () => activateChallenge(3));
+    
+    // Check Challenge outcomes at end of simulation
+    function checkChallengeOutcomes() {
+        if (!activeChallenge) return;
+        
+        if (activeChallenge === 1) {
+            const hasSecureKey = (qkd.secureKey.length > 0);
+            const pnsActive = (qkd.evePresent && qkd.eveStrategy === 'pns');
+            const wcpActive = (qkd.lightSourceMode === 'wcp');
+            
+            if (qkd.distance >= 50 && pnsActive && wcpActive && qkd.decoyStatesEnabled && hasSecureKey) {
+                challengeStatuses[0] = true;
+                badgeC1.className = 'challenge-badge badge-solved';
+                badgeC1.textContent = 'Solved';
+                logConsole("CHALLENGE SOLVED: Decoy states successfully estimated PNS thresholds and rescued the key rate!", "success");
+                activeChallenge = null;
+                challenge1Card.classList.remove('active-mission');
+            } else {
+                logConsole("Mission 1 Incomplete: Key compromised or distance/settings incorrect.", "error");
+            }
+        } else if (activeChallenge === 2) {
+            const eveBitsRead = qkd.eveLearnedInfo.filter(info => info === 1).length;
+            const hasSecureKey = (qkd.secureKey.length > 0);
+            
+            if (eveBitsRead >= 15 && qkd.qber < 0.11 && hasSecureKey) {
+                challengeStatuses[1] = true;
+                badgeC2.className = 'challenge-badge badge-solved';
+                badgeC2.textContent = 'Solved';
+                logConsole(`CHALLENGE SOLVED: Eve stole ${eveBitsRead} bits without raising QBER above Bob's threshold!`, "success");
+                activeChallenge = null;
+                challenge2Card.classList.remove('active-mission');
+            } else {
+                logConsole(`Mission 2 Incomplete: Eve read ${eveBitsRead} bits, QBER was ${(qkd.qber*100).toFixed(1)}%.`, "error");
+            }
+        } else if (activeChallenge === 3) {
+            const hasSecureKey = (qkd.secureKey.length > 0);
+            
+            if (qkd.protocol === 'B92' && hasSecureKey) {
+                challengeStatuses[2] = true;
+                badgeC3.className = 'challenge-badge badge-solved';
+                badgeC3.textContent = 'Solved';
+                logConsole("CHALLENGE SOLVED: B92 transmission successfully calibrated!", "success");
+                activeChallenge = null;
+                challenge3Card.classList.remove('active-mission');
+            } else {
+                logConsole("Mission 3 Incomplete: Check sifting calibrations under B92.", "error");
+            }
+        }
+    }
+    
     // Particle Explosion helper
-    class Particle {
+    class ParticleExplosion {
         constructor(x, y, color) {
-            this.x = x;
-            this.y = y;
-            this.color = color;
-            this.vx = (Math.random() - 0.5) * 5;
-            this.vy = (Math.random() - 0.5) * 5;
-            this.alpha = 1;
-            this.size = Math.random() * 3 + 1;
-            this.decay = Math.random() * 0.04 + 0.015;
-        }
-        
-        update() {
-            this.x += this.vx;
-            this.y += this.vy;
-            this.alpha -= this.decay;
-        }
-        
-        draw(c) {
-            c.save();
-            c.globalAlpha = this.alpha;
-            c.beginPath();
-            c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            c.fillStyle = this.color;
-            c.fill();
-            c.restore();
+            createExplosion(x, y, color, 12);
         }
     }
     
-    function createExplosion(x, y, color, count = 12) {
-        for (let i = 0; i < count; i++) {
-            particles.push(new Particle(x, y, color));
-        }
-    }
-    
-    // Physics-based visualizer animation loop
+    // Visualizer loop
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        const width = canvas.width / window.devicePixelRatio;
-        const height = canvas.height / window.devicePixelRatio;
         
         // 1. Draw fiber channel line
         ctx.save();
@@ -209,7 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineTo(receiverX, middleY);
         ctx.stroke();
         
-        // Core guide light
         ctx.strokeStyle = 'rgba(0, 242, 254, 0.15)';
         ctx.lineWidth = 2;
         ctx.shadowColor = 'var(--neon-cyan)';
@@ -217,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.stroke();
         ctx.restore();
         
-        // 2. Draw Alice Laser Box
+        // 2. Alice
         ctx.save();
         ctx.fillStyle = 'rgba(16, 20, 38, 0.85)';
         ctx.strokeStyle = 'var(--neon-cyan)';
@@ -235,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillText('ALICE', transmitterX, middleY);
         ctx.restore();
         
-        // 3. Draw Bob Receiver Box
+        // 3. Bob
         ctx.save();
         ctx.fillStyle = 'rgba(16, 20, 38, 0.85)';
         ctx.strokeStyle = 'var(--neon-purple)';
@@ -253,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillText('BOB', receiverX, middleY);
         ctx.restore();
         
-        // 4. Draw Eve if active
+        // 4. Eve
         const midX = (transmitterX + receiverX) / 2;
         if (qkd.evePresent) {
             ctx.save();
@@ -274,78 +412,72 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.restore();
         }
         
-        // 5. Draw and update photons
+        // 5. Photons
         let activePhotons = [];
         for (let i = 0; i < photons.length; i++) {
             let photon = photons[i];
             
-            // Channel Attenuation simulator: photons fade out at random segments
-            // based on link distance (higher distance increases absorption rate)
             if (!photon.absorbed) {
                 photon.x += photon.speed;
-                
-                // Loss model: fade out photon based on random drop out in fiber
-                const distanceFactor = qkd.distance / 120; // 0 to 1 scaling
+                const distanceFactor = qkd.distance / 120;
                 if (photon.x > transmitterX + 50 && photon.x < receiverX - 50) {
-                    // Random absorption chance
                     if (Math.random() < 0.0012 * distanceFactor) {
                         photon.absorbed = true;
                         createExplosion(photon.x, photon.y, 'rgba(255, 255, 255, 0.2)', 4);
                     }
                 }
             } else {
-                photon.alpha -= 0.05; // Fade out absorption
+                photon.alpha -= 0.05;
             }
             
-            if (photon.alpha <= 0) continue; // photon is absorbed and faded
+            if (photon.alpha <= 0) continue;
             
-            // Check for Eve interception
+            // Eve Intercept
             if (qkd.evePresent && !photon.intercepted && photon.x >= midX && !photon.absorbed) {
                 photon.intercepted = true;
                 
                 if (qkd.eveStrategy === 'pns' && photon.photonCount > 1) {
-                    // PNS Attack: Eve intercepts 1 photon from multi-photon cluster.
-                    // Visualizes 1 sub-particle moving to Eve, rest proceeding to Bob.
                     createExplosion(midX, middleY, 'var(--neon-orange)', 8);
-                    logConsole(`Pulse #${photon.index + 1} ($n=${photon.photonCount}$): Eve split off 1 photon to memory. Remaining parts proceed.`, 'warning');
-                    photon.color = 'var(--neon-purple)'; // show Bob gets shifted/normal states
+                    logConsole(`Pulse #${photon.index + 1} ($n=${photon.photonCount}$): Eve split off 1 photon to memory.`, 'warning');
+                    photon.color = 'var(--neon-purple)';
                 } else {
-                    // Standard Intercept-Resend: measures and replaces photon.
                     photon.color = 'var(--neon-orange)';
                     createExplosion(midX, middleY, 'var(--neon-orange)', 12);
                     logConsole(`Pulse #${photon.index + 1}: Intercepted and measured by Eve in basis ${simulationResults.eveBases[photon.index]}`, 'warning');
                 }
             }
             
-            // Check for reaching Bob
+            // Bob Receive
             if (photon.x >= receiverX && !photon.absorbed) {
                 const clicked = simulationResults.bobClicks[photon.index];
                 if (clicked) {
                     createExplosion(receiverX, middleY, photon.color, 12);
                     const bitVal = simulationResults.bobBits[photon.index];
                     const basisVal = simulationResults.bobBases[photon.index];
-                    const matchText = (simulationResults.aliceBases[photon.index] === basisVal) ? 'sifted match' : 'basis mismatch';
+                    
+                    let matchText = '';
+                    if (qkd.protocol === 'B92') {
+                        matchText = (basisVal === BASES.RECTILINEAR && bitVal === 1) || (basisVal === BASES.DIAGONAL && bitVal === 1) ? 'sifted conclusive click' : 'inconclusive click';
+                    } else {
+                        matchText = (simulationResults.aliceBases[photon.index] === basisVal) ? 'sifted match' : 'basis mismatch';
+                    }
                     logConsole(`Bob detected click for Pulse #${photon.index + 1} (${basisVal}) -> Bit ${bitVal} (${matchText})`);
                 } else {
-                    // Absorbed at the receiver interface
                     createExplosion(receiverX, middleY, 'rgba(255,255,255,0.05)', 3);
-                    logConsole(`Bob: No click registered for Pulse #${photon.index + 1} (Photon loss/dark check failed)`);
+                    logConsole(`Bob: No click registered for Pulse #${photon.index + 1}`);
                 }
-                continue; // remove from list
+                continue;
             }
             
             activePhotons.push(photon);
             
-            // Draw photon pulse
             ctx.save();
             ctx.globalAlpha = photon.alpha;
             ctx.fillStyle = photon.color;
             ctx.shadowBlur = 10;
             ctx.shadowColor = photon.color;
             
-            // Draw multi-photon pulses as a small constellation of circles
             if (photon.photonCount > 1 && !photon.intercepted) {
-                // Draw 3 small circles clustered together
                 const offsets = [[-4, -3], [4, -3], [0, 4]];
                 offsets.forEach(off => {
                     ctx.beginPath();
@@ -353,20 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     ctx.fill();
                 });
             } else if (photon.photonCount === 0) {
-                // Vacuum pulse: draw a dim hollow ring
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.arc(photon.x, photon.y, photon.size - 2, 0, Math.PI * 2);
                 ctx.stroke();
             } else {
-                // Single photon: draw standard circle
                 ctx.beginPath();
                 ctx.arc(photon.x, photon.y, photon.size, 0, Math.PI * 2);
                 ctx.fill();
             }
             
-            // Draw orientation line inside single photons
             if (photon.photonCount === 1) {
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 2;
@@ -387,7 +516,6 @@ document.addEventListener('DOMContentLoaded', () => {
             goToStep(2);
         }
         
-        // 6. Draw particles
         particles.forEach((p, index) => {
             p.update();
             p.draw(ctx);
@@ -400,7 +528,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function launchPhotonStream() {
         photons = [];
         particles = [];
-        
         const count = simulationResults.aliceBits.length;
         const spacing = 45;
         
@@ -410,13 +537,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const photonCount = simulationResults.photonCounts[i];
             
             let angle = 0;
-            if (basis === BASES.RECTILINEAR) {
-                angle = (bit === 0) ? 0 : Math.PI / 2;
+            if (qkd.protocol === 'B92') {
+                // B92 encodes 0 as H (0 deg), 1 as D (45 deg)
+                angle = (bit === 0) ? 0 : Math.PI / 4;
             } else {
-                angle = (bit === 0) ? Math.PI / 4 : (3 * Math.PI) / 4;
+                if (basis === BASES.RECTILINEAR) {
+                    angle = (bit === 0) ? 0 : Math.PI / 2;
+                } else {
+                    angle = (bit === 0) ? Math.PI / 4 : (3 * Math.PI) / 4;
+                }
             }
             
-            const color = basis === BASES.RECTILINEAR ? 'var(--neon-cyan)' : 'var(--neon-purple)';
+            const color = (basis === BASES.RECTILINEAR) ? 'var(--neon-cyan)' : 'var(--neon-purple)';
             
             photons.push({
                 index: i,
@@ -438,14 +570,13 @@ document.addEventListener('DOMContentLoaded', () => {
         logConsole(`Alice fires ${count} coherent optical pulses down the fiber...`);
     }
     
-    // Draw secure key rate vs distance chart
+    // Chart rendering
     function drawChart() {
         const width = chartCanvas.width / window.devicePixelRatio;
         const height = chartCanvas.height / window.devicePixelRatio;
         
         chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
         
-        // Grid Margins
         const marginL = 50;
         const marginR = 25;
         const marginT = 20;
@@ -454,7 +585,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const chartW = width - marginL - marginR;
         const chartH = height - marginT - marginB;
         
-        // Draw Grid Lines & Axes
         chartCtx.save();
         chartCtx.strokeStyle = 'rgba(255,255,255,0.06)';
         chartCtx.lineWidth = 1;
@@ -463,35 +593,28 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.textAlign = 'right';
         chartCtx.textBaseline = 'middle';
         
-        // Y grid lines (Key Rate 0.0 to 0.5)
         for (let i = 0; i <= 5; i++) {
             const val = i * 0.1;
             const y = marginT + chartH * (1 - val / 0.5);
-            
             chartCtx.beginPath();
             chartCtx.moveTo(marginL, y);
             chartCtx.lineTo(width - marginR, y);
             chartCtx.stroke();
-            
             chartCtx.fillText(val.toFixed(1), marginL - 8, y);
         }
         
-        // X grid lines (Distance 0 to 120 km)
         chartCtx.textAlign = 'center';
         chartCtx.textBaseline = 'top';
         for (let i = 0; i <= 6; i++) {
             const val = i * 20;
             const x = marginL + chartW * (val / 120);
-            
             chartCtx.beginPath();
             chartCtx.moveTo(x, marginT);
             chartCtx.lineTo(x, height - marginB);
             chartCtx.stroke();
-            
             chartCtx.fillText(`${val}k`, x, height - marginB + 8);
         }
         
-        // Axis Lines
         chartCtx.strokeStyle = 'rgba(255,255,255,0.12)';
         chartCtx.lineWidth = 2;
         chartCtx.beginPath();
@@ -500,7 +623,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.lineTo(width - marginR, height - marginB);
         chartCtx.stroke();
         
-        // Labels
         chartCtx.font = '10px Outfit';
         chartCtx.fillStyle = 'var(--text-secondary)';
         chartCtx.fillText("Distance (km)", marginL + chartW / 2, height - 12);
@@ -512,55 +634,46 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.restore();
         chartCtx.restore();
         
-        // Calculate theoretical rates
-        const dists = Array.from({length: 25}, (_, i) => i * 5); // 0 to 120
+        const dists = Array.from({length: 25}, (_, i) => i * 5);
         const data = qkd.calculateTheoreticalKeyRates(dists);
         
-        // Helper to map rates to coords
         function mapX(d) { return marginL + chartW * (d / 120); }
         function mapY(r) { return marginT + chartH * (1 - r / 0.5); }
         
-        // Plot curves
-        function drawCurve(rates, color, label) {
+        function drawCurve(rates, color) {
             chartCtx.save();
             chartCtx.strokeStyle = color;
             chartCtx.lineWidth = 2;
             chartCtx.beginPath();
-            
             rates.forEach((r, idx) => {
                 const x = mapX(dists[idx]);
                 const y = mapY(r);
                 if (idx === 0) chartCtx.moveTo(x, y);
                 else chartCtx.lineTo(x, y);
             });
-            
             chartCtx.stroke();
             chartCtx.restore();
         }
         
-        drawCurve(data.ideal, 'var(--neon-cyan)', 'Ideal');
-        drawCurve(data.wcpDecoy, 'var(--neon-purple)', 'WCP Decoy');
-        drawCurve(data.wcpNoDecoy, 'var(--neon-orange)', 'WCP No Decoy');
+        drawCurve(data.ideal, 'var(--neon-cyan)');
+        drawCurve(data.wcpDecoy, 'var(--neon-purple)');
+        drawCurve(data.wcpNoDecoy, 'var(--neon-orange)');
         
-        // Draw Current Operating Point indicator dot
+        // Dot marker
         const currD = qkd.distance;
-        // Calculate rate for current distance
         const tempModule = new QKDModule();
         tempModule.detectorEfficiency = qkd.detectorEfficiency;
         tempModule.darkCountRate = qkd.darkCountRate;
         tempModule.fiberAttenuation = qkd.fiberAttenuation;
         tempModule.meanPhotonNumber = qkd.meanPhotonNumber;
         tempModule.noiseLevel = qkd.noiseLevel;
+        tempModule.protocol = qkd.protocol; // track protocol factor!
         
         const currRates = tempModule.calculateTheoreticalKeyRates([currD]);
         let currR = 0;
-        if (qkd.lightSourceMode === 'single_photon') {
-            currR = currRates.ideal[0];
-        } else if (qkd.decoyStatesEnabled) {
-            currR = currRates.wcpDecoy[0];
-        } else {
-            currR = currRates.wcpNoDecoy[0];
-        }
+        if (qkd.lightSourceMode === 'single_photon') currR = currRates.ideal[0];
+        else if (qkd.decoyStatesEnabled) currR = currRates.wcpDecoy[0];
+        else currR = currRates.wcpNoDecoy[0];
         
         const dotX = mapX(currD);
         const dotY = mapY(currR);
@@ -573,7 +686,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.arc(dotX, dotY, 6, 0, Math.PI * 2);
         chartCtx.fill();
         
-        // Pulser ring
         chartCtx.strokeStyle = 'var(--neon-green)';
         chartCtx.globalAlpha = 0.4;
         chartCtx.beginPath();
@@ -581,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.stroke();
         chartCtx.restore();
         
-        // Draw Legend box
+        // Legend
         const legX = width - 110;
         const legY = marginT + 10;
         chartCtx.save();
@@ -609,14 +721,13 @@ document.addEventListener('DOMContentLoaded', () => {
             chartCtx.beginPath();
             chartCtx.arc(legX + 8, itemY + 4, 3, 0, Math.PI * 2);
             chartCtx.fill();
-            
             chartCtx.fillStyle = 'var(--text-secondary)';
             chartCtx.fillText(item.text, legX + 16, itemY + 6);
         });
         chartCtx.restore();
     }
     
-    // Set Active Step
+    // Set Active Wizard Step
     function goToStep(stepIndex) {
         currentStep = stepIndex;
         steps.forEach((s, idx) => {
@@ -627,19 +738,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (currentStep === 0) {
             btnStep.textContent = "Start Transmission";
-            logConsole("Phase 1: Alice prepared state streams and configured decoy pulse modulations.");
+            logConsole(`Phase 1: Alice prepared ${qkd.protocol} state streams.`);
         } else if (currentStep === 1) {
             btnStep.textContent = "Bob Detects Pulses";
             launchPhotonStream();
         } else if (currentStep === 2) {
             btnStep.textContent = "Sift Bases";
-            logConsole("Phase 3: Transmission completed. Bob recorded clicks. Discarding loss/dark pulses.");
+            logConsole("Phase 3: Bob recorded measurement results. Preparing sifting announcement.");
             updateStatsRow();
         } else if (currentStep === 3) {
             btnStep.textContent = "Reconcile & Amplify";
             qkd.siftKeys();
             renderTableData(true);
-            logConsole("Phase 4: Sifting done. Comparing matching bases over classical network.");
+            logConsole("Phase 4: Public sifting complete. Sifted bits aligned.");
             updateStatsRow();
         } else if (currentStep === 4) {
             btnStep.textContent = "Simulation Reset";
@@ -647,11 +758,12 @@ document.addEventListener('DOMContentLoaded', () => {
             qkd.applyPrivacyAmplification();
             updateStatsRow();
             renderFinalKeys();
-            logConsole("Phase 5: Secure keys reconciled and privacy amplification hashes generated.", 'success');
+            checkChallengeOutcomes(); // Check challenge outcomes!
+            logConsole("Phase 5: Privacy amplification done. Key rate verified.", 'success');
         }
     }
     
-    // Render stats
+    // Update yield and error rates
     function updateStatsRow() {
         if (currentStep < 2) {
             statYield.textContent = "-";
@@ -667,8 +779,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentStep >= 4) {
             const qberVal = qkd.qber * 100;
             statQber.textContent = `${qberVal.toFixed(1)}%`;
-            
-            // Check if key is compromised
             const isCompromised = (qkd.secureKey.length === 0);
             
             if (isCompromised) {
@@ -691,9 +801,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render key outputs
     function renderFinalKeys() {
         if (qkd.secureKey.length === 0) {
-            secretKeyReconciled.textContent = "Key Discarded (Security Breach or Attenuation Cutoff).";
+            secretKeyReconciled.textContent = "Key Discarded (Security bounds exceeded).";
             secretKeyReconciled.style.color = 'var(--neon-pink)';
-            secretKeyAmplified.textContent = "Secret key rate is 0. Key transmission blocked.";
+            secretKeyAmplified.textContent = "Rate dropped to 0. Key blocked.";
             secretKeyAmplified.style.color = 'var(--neon-pink)';
         } else {
             const rawKey = qkd.siftedKeyAlice.join('');
@@ -706,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Render details table
+    // Render Table Details
     function renderTableData(showMatches = false) {
         stateTableBody.innerHTML = '';
         const length = qkd.aliceBits.length;
@@ -719,7 +829,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tdIndex.textContent = i + 1;
             tr.appendChild(tdIndex);
             
-            // Pulse State (Signal/Decoy/Vacuum)
+            // Pulse Type
             const tdPulse = document.createElement('td');
             tdPulse.textContent = qkd.pulseStates[i];
             if (qkd.pulseStates[i] === 'DECOY') tdPulse.style.color = 'var(--neon-purple)';
@@ -743,17 +853,37 @@ document.addEventListener('DOMContentLoaded', () => {
             tdAliceBasis.innerHTML = `<span class="${abClass}">${qkd.aliceBases[i]}</span>`;
             tr.appendChild(tdAliceBasis);
             
-            // Polarization symbol
+            // Polarization
             const tdPolarization = document.createElement('td');
             let symbolClass = qkd.aliceBases[i] === BASES.RECTILINEAR ? 'symbol-rect' : 'symbol-diag';
             let symbolChar = '';
-            if (qkd.aliceBases[i] === BASES.RECTILINEAR) {
-                symbolChar = qkd.aliceBits[i] === 0 ? '→' : '↑';
+            
+            if (qkd.protocol === 'B92') {
+                symbolChar = qkd.aliceBits[i] === 0 ? '→' : '↗';
+                symbolClass = qkd.aliceBits[i] === 0 ? 'symbol-rect' : 'symbol-diag';
             } else {
-                symbolChar = qkd.aliceBits[i] === 0 ? '↗' : '↖';
+                if (qkd.aliceBases[i] === BASES.RECTILINEAR) {
+                    symbolChar = qkd.aliceBits[i] === 0 ? '→' : '↑';
+                } else {
+                    symbolChar = qkd.aliceBits[i] === 0 ? '↗' : '↖';
+                }
             }
             tdPolarization.innerHTML = `<span class="basis-symbol ${symbolClass}">${symbolChar}</span>`;
             tr.appendChild(tdPolarization);
+            
+            // SARG Set announcement / B92 state name
+            const tdAnnouncement = document.createElement('td');
+            if (qkd.protocol === 'SARG04') {
+                tdAnnouncement.textContent = qkd.sargAnnouncements[i];
+                tdAnnouncement.style.color = 'var(--text-secondary)';
+            } else if (qkd.protocol === 'B92') {
+                tdAnnouncement.textContent = qkd.aliceBits[i] === 0 ? 'H (Rect 0)' : 'D (Diag 1)';
+                tdAnnouncement.style.color = 'var(--text-secondary)';
+            } else {
+                tdAnnouncement.textContent = '-';
+                tdAnnouncement.style.color = 'var(--text-muted)';
+            }
+            tr.appendChild(tdAnnouncement);
             
             // Eve columns
             const tdEveBasis = document.createElement('td');
@@ -796,9 +926,26 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Sift Match
             const tdSift = document.createElement('td');
-            const match = qkd.bobClicks[i] && qkd.aliceBases[i] === qkd.bobBases[i];
+            
+            let isSiftMatch = false;
+            if (qkd.bobClicks[i]) {
+                if (qkd.protocol === 'BB84') {
+                    isSiftMatch = (qkd.aliceBases[i] === qkd.bobBases[i]);
+                } else if (qkd.protocol === 'B92') {
+                    isSiftMatch = (qkd.bobBases[i] === BASES.RECTILINEAR && qkd.bobMeasuredBits[i] === 1) || (qkd.bobBases[i] === BASES.DIAGONAL && qkd.bobMeasuredBits[i] === 1);
+                } else if (qkd.protocol === 'SARG04') {
+                    const state = qkd.alicePhotons[i].polarization;
+                    const basis = qkd.bobBases[i];
+                    const raw = qkd.bobMeasuredBits[i];
+                    if (state === POLARIZATIONS.HORIZONTAL && basis === BASES.DIAGONAL && raw === 1) isSiftMatch = true;
+                    else if (state === POLARIZATIONS.VERTICAL && basis === BASES.DIAGONAL && raw === 0) isSiftMatch = true;
+                    else if (state === POLARIZATIONS.DIAGONAL_45 && basis === BASES.RECTILINEAR && raw === 0) isSiftMatch = true;
+                    else if (state === POLARIZATIONS.DIAGONAL_135 && basis === BASES.RECTILINEAR && raw === 1) isSiftMatch = true;
+                }
+            }
+            
             if (showMatches) {
-                if (match) {
+                if (isSiftMatch) {
                     tdSift.innerHTML = `<span class="status-match">✓ Match</span>`;
                     tr.style.background = 'rgba(0, 255, 135, 0.04)';
                 } else {
@@ -825,7 +972,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const size = parseInt(keyLengthSlider.value);
         const noise = parseFloat(noiseSlider.value) / 100;
         
-        logConsole(`Starting automatic physical link simulation. Attenuation distance: ${qkd.distance} km...`, 'info');
+        logConsole(`Starting full link simulation (${qkd.protocol}). Distance: ${qkd.distance} km...`, 'info');
         
         simulationResults = qkd.runSimulation(size, noise, qkd.evePresent);
         
@@ -839,8 +986,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTableData(true);
         renderFinalKeys();
         drawChart();
+        checkChallengeOutcomes(); // Check challenge outcomes!
         
-        logConsole("Physics-based QKD simulation finished. Metrics fully logged.", "success");
+        logConsole("Physics QKD simulation complete. Statistical results verified.", "success");
     });
     
     // Step by Step button
@@ -861,6 +1009,7 @@ document.addEventListener('DOMContentLoaded', () => {
             qkd.decoyStatesEnabled = decoyToggle.checked;
             qkd.evePresent = eveToggle.checked;
             qkd.eveStrategy = eveStrategySelect.value;
+            qkd.protocol = protocolSelect.value;
             
             qkd.generateAliceStates(size);
             simulationResults = {
@@ -872,7 +1021,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 eveBases: qkd.eveBases,
                 eveMeasuredBits: qkd.eveMeasuredBits,
                 photonCounts: qkd.photonCounts,
-                pulseStates: qkd.pulseStates
+                pulseStates: qkd.pulseStates,
+                sargAnnouncements: qkd.sargAnnouncements
             };
             
             qkd.bobBases = Array(size).fill('-');
@@ -905,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 goToStep(0);
                 steps.forEach(s => s.classList.remove('active', 'completed'));
                 steps[0].classList.add('active');
-                stateTableBody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">No simulation data available. Click "Run Full Simulation" to generate states.</td></tr>`;
+                stateTableBody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">No simulation data available. Click "Run Full Simulation" to generate states.</td></tr>`;
                 btnStep.textContent = "Start Step-by-Step";
                 logConsole("Simulation workspace reset.");
             }
