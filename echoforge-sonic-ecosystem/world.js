@@ -35,9 +35,9 @@
   class World {
     constructor(opts) {
       opts = opts || {};
-      this.w = opts.w || 800;
-      this.h = opts.h || 600;
-      this.maxPop = opts.maxPop || 60;
+      this.w = Math.max(1, Number(opts.w) || 800);
+      this.h = Math.max(1, Number(opts.h) || 600);
+      this.maxPop = Math.max(1, Math.floor(Number(opts.maxPop) || 60));
       this.organisms = [];
       this.food = new FoodField(this.w, this.h);
       this.tick = 0;
@@ -47,6 +47,8 @@
 
     seed(n, rng) {
       rng = rng || Math.random;
+      const room = Math.max(0, this.maxPop - this.organisms.length);
+      n = Math.min(Math.max(0, Math.floor(Number(n) || 0)), room);
       for (let i = 0; i < n; i++) {
         const gene = new Genome(Genome.random(rng));
         const o = new Organism(gene, rng() * this.w, rng() * this.h);
@@ -56,8 +58,17 @@
     }
 
     resize(w, h) {
-      this.w = w; this.h = h;
-      this.food = new FoodField(w, h);
+      this.w = Math.max(1, Number(w) || 1);
+      this.h = Math.max(1, Number(h) || 1);
+      this.food = new FoodField(this.w, this.h);
+    }
+
+    reset() {
+      this.organisms = [];
+      this.food = new FoodField(this.w, this.h);
+      this.tick = 0;
+      this.time = 0;
+      this.stats = { born: 0, died: 0, generation: 0 };
     }
 
     step(dt) {
@@ -70,19 +81,14 @@
         const kids = o.step(dt, bounds, this.food);
         for (const k of kids) newborns.push(k);
       }
-      // Remove dead
       const before = this.organisms.length;
       this.organisms = this.organisms.filter(o => o.alive);
       this.stats.died += before - this.organisms.length;
-
-      // Add newborns respecting pop cap
       for (const k of newborns) {
         if (this.organisms.length >= this.maxPop) break;
         this.organisms.push(k);
         this.stats.born++;
       }
-
-      // Prevent extinction: reseed a couple if population collapses
       if (this.organisms.length < 3) {
         this.stats.generation++;
         this.seed(6);
@@ -90,21 +96,11 @@
       return this.organisms;
     }
 
-    // Notes wanted this frame (organism + descriptor). No audio here.
     notes(now) {
       const out = [];
       for (const o of this.organisms) {
         if (o.wantsNote(now)) {
-          out.push({
-            id: o.id,
-            freq: o.genome.frequency() * o.genome.intervalRatio(),
-            wave: o.genome.waveform(),
-            filterHz: o.genome.filterHz(),
-            filterQ: o.genome.filterQ(),
-            attack: o.genome.attackSec(),
-            release: o.genome.releaseSec(),
-            gain: Math.min(0.25, 0.06 + o.energy / 800)
-          });
+          out.push({ id: o.id, freq: o.genome.frequency() * o.genome.intervalRatio(), wave: o.genome.waveform(), filterHz: o.genome.filterHz(), filterQ: o.genome.filterQ(), attack: o.genome.attackSec(), release: o.genome.releaseSec(), gain: Math.min(0.25, 0.06 + o.energy / 800) });
         }
       }
       return out;
@@ -119,7 +115,6 @@
   }
 
   World.FoodField = FoodField;
-
   if (typeof module !== 'undefined' && module.exports) module.exports = World;
   else root.World = World;
 })(typeof window !== 'undefined' ? window : globalThis);
