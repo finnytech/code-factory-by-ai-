@@ -217,7 +217,14 @@
                     </div>
                     <div class="compiler-tab-content scrollable">
                         <div id="tab-reactions" class="tab-panel active">
-                            <pre><code id="compiler-reactions-code">// Compiled reactions...</code></pre>
+                            <div class="reactions-split-layout">
+                                <div class="reactions-text-panel scrollable">
+                                    <pre><code id="compiler-reactions-code">// Compiled reactions...</code></pre>
+                                </div>
+                                <div class="reactions-graph-panel">
+                                    <svg id="crn-graph-svg" viewBox="0 0 350 200"></svg>
+                                </div>
+                            </div>
                         </div>
                         <div id="tab-sequences" class="tab-panel">
                             <div class="sequences-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">

@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPlaying = false;
 
     // Initialize Renderer
-    renderer = new DSDRenderer(canvas, svgChart, legendContainer);
+    renderer = new DSDRenderer(canvas, svgChart, legendContainer, document.getElementById('crn-graph-svg'));
 
     // Setup tabs
     const tabButtons = document.querySelectorAll('.tab-btn');
@@ -337,6 +337,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.buildLegend(compiledData.species);
         renderer.syncParticles(simulator.state, compiledData.species);
         renderer.plotChart(simulator.history, compiledData.species);
+        renderer.buildCRNGraph(compiledData.reactions, compiledData.species);
+        renderer.drawCRNGraph(simulator.state);
         
         canvasOverlay.classList.remove('hidden');
     }
@@ -515,6 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Plot updated chart
             renderer.plotChart(simulator.history, compiledData.species);
             
+            // Draw updated CRN graph
+            renderer.drawCRNGraph(simulator.state);
+            
             // Update time label in chart
             document.getElementById('chart-time').textContent = `Time: ${simulator.time.toFixed(2)}s`;
 
@@ -562,6 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         renderer.syncParticles(simulator.state, compiledData.species);
         renderer.plotChart(simulator.history, compiledData.species);
+        renderer.drawCRNGraph(simulator.state);
         
         document.getElementById('chart-time').textContent = `Time: 0.0s`;
         canvasOverlay.classList.remove('hidden');

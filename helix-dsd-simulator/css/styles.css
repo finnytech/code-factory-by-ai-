@@ -999,4 +999,77 @@ input:checked + .slider:before {
     color: #fde68a;
 }
 
+/* Reactions split layout & CRN Graph styles */
+.reactions-split-layout {
+    display: flex;
+    gap: 1rem;
+    height: 100%;
+    min-height: 180px;
+}
+
+.reactions-text-panel {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.reactions-graph-panel {
+    flex: 1.2;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+}
+
+#crn-graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* SVG nodes styling */
+.crn-link {
+    stroke: rgba(255, 255, 255, 0.15);
+    stroke-width: 1.25;
+    fill: none;
+}
+
+.crn-link.to-product {
+    stroke: rgba(6, 182, 212, 0.3);
+}
+
+.crn-node-species {
+    stroke-width: 1.5;
+    transition: r 0.25s, fill-opacity 0.25s;
+    cursor: pointer;
+}
+
+.crn-node-reaction {
+    fill: #4b5563;
+    stroke: #9ca3af;
+    stroke-width: 1;
+    width: 6px;
+    height: 6px;
+}
+
+.crn-label {
+    font-family: var(--font-mono);
+    font-size: 7px;
+    font-weight: bold;
+    fill: var(--text-secondary);
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.crn-rx-label {
+    font-family: var(--font-sans);
+    font-size: 6px;
+    fill: var(--text-muted);
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+
 

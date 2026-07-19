@@ -5,11 +5,15 @@
  */
 
 class DSDRenderer {
-    constructor(canvas, svgChart, legendContainer) {
+    constructor(canvas, svgChart, legendContainer, svgGraph) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.svg = svgChart;
         this.legendContainer = legendContainer;
+        this.svgGraph = svgGraph;
+        
+        this.graphNodes = [];
+        this.graphLinks = [];
         
         this.particles = [];
         this.selectedParticle = null;
@@ -538,6 +542,225 @@ class DSDRenderer {
 
         svgHtml += `</svg>`;
         return svgHtml;
+    }
+
+    // Build the nodes and links for the CRN layout graph
+    buildCRNGraph(reactions, speciesList) {
+        this.graphNodes = [];
+        this.graphLinks = [];
+        if (!this.svgGraph) return;
+
+        // 1. Filter out spent complexes to avoid visual clutter
+        const activeSpecies = speciesList.filter(sp => sp.type !== 'spent' && sp.type !== 'spent_active');
+        
+        // 2. Add species nodes
+        activeSpecies.forEach(sp => {
+            this.graphNodes.push({
+                id: sp.id,
+                name: sp.id,
+                type: 'species',
+                color: sp.color,
+                x: 60 + Math.random() * 230,
+                y: 40 + Math.random() * 120,
+                vx: 0,
+                vy: 0
+            });
+        });
+
+        // 3. Add reaction junction nodes and links
+        reactions.forEach((rx, idx) => {
+            const rxNodeId = `rx_node_${idx}`;
+            this.graphNodes.push({
+                id: rxNodeId,
+                name: rx.rateKey,
+                type: 'reaction',
+                x: 60 + Math.random() * 230,
+                y: 40 + Math.random() * 120,
+                vx: 0,
+                vy: 0
+            });
+
+            // Links: reactant -> reaction
+            rx.reactants.forEach(reactant => {
+                if (activeSpecies.some(s => s.id === reactant)) {
+                    this.graphLinks.push({
+                        source: reactant,
+                        target: rxNodeId,
+                        type: 'reactant'
+                    });
+                }
+            });
+
+            // Links: reaction -> product
+            rx.products.forEach(product => {
+                if (activeSpecies.some(s => s.id === product)) {
+                    this.graphLinks.push({
+                        source: rxNodeId,
+                        target: product,
+                        type: 'product'
+                    });
+                }
+            });
+        });
+
+        // Run layout calculation steps immediately to stabilize positions
+        for (let i = 0; i < 200; i++) {
+            this.updateCRNGraphLayout();
+        }
+    }
+
+    // Force-directed graph layout algorithm (Spring repulsion + attraction)
+    updateCRNGraphLayout() {
+        const width = 350;
+        const height = 200;
+
+        // Node repulsion force
+        for (let i = 0; i < this.graphNodes.length; i++) {
+            const n1 = this.graphNodes[i];
+            for (let j = i + 1; j < this.graphNodes.length; j++) {
+                const n2 = this.graphNodes[j];
+                const dx = n2.x - n1.x;
+                const dy = n2.y - n1.y;
+                const d2 = dx * dx + dy * dy + 0.1;
+                const dist = Math.sqrt(d2);
+                
+                if (dist < 120) {
+                    const f = (n1.type === 'reaction' || n2.type === 'reaction') ? 50 / d2 : 120 / d2;
+                    n1.vx -= (dx / dist) * f;
+                    n1.vy -= (dy / dist) * f;
+                    n2.vx += (dx / dist) * f;
+                    n2.vy += (dy / dist) * f;
+                }
+            }
+        }
+
+        // Spring attraction force along links
+        this.graphLinks.forEach(link => {
+            const sNode = this.graphNodes.find(n => n.id === link.source);
+            const tNode = this.graphNodes.find(n => n.id === link.target);
+            
+            if (sNode && tNode) {
+                const dx = tNode.x - sNode.x;
+                const dy = tNode.y - sNode.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                const restLength = link.type === 'reactant' ? 35 : 45;
+                const k = 0.05;
+                const f = k * (dist - restLength);
+                
+                sNode.vx += (dx / dist) * f;
+                sNode.vy += (dy / dist) * f;
+                tNode.vx -= (dx / dist) * f;
+                tNode.vy -= (dy / dist) * f;
+            }
+        });
+
+        // Center gravity and velocity update
+        const cx = width / 2;
+        const cy = height / 2;
+        this.graphNodes.forEach(n => {
+            n.vx += (cx - n.x) * 0.015;
+            n.vy += (cy - n.y) * 0.015;
+
+            n.vx *= 0.8;
+            n.vy *= 0.8;
+
+            n.x += n.vx;
+            n.y += n.vy;
+
+            // Constrain within borders
+            n.x = Math.max(18, Math.min(width - 18, n.x));
+            n.y = Math.max(18, Math.min(height - 18, n.y));
+        });
+    }
+
+    // Draw the CRN Layout Graph in SVG
+    drawCRNGraph(state) {
+        if (!this.svgGraph) return;
+        this.svgGraph.innerHTML = '';
+
+        // Draw arrow definitions
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        defs.innerHTML = `
+            <marker id="arrow" viewBox="0 0 10 10" refX="11" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="rgba(255,255,255,0.25)" />
+            </marker>
+        `;
+        this.svgGraph.appendChild(defs);
+
+        // Draw link lines
+        this.graphLinks.forEach(link => {
+            const sNode = this.graphNodes.find(n => n.id === link.source);
+            const tNode = this.graphNodes.find(n => n.id === link.target);
+            if (sNode && tNode) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', sNode.x);
+                line.setAttribute('y1', sNode.y);
+                line.setAttribute('x2', tNode.x);
+                line.setAttribute('y2', tNode.y);
+                line.className.baseVal = `crn-link ${link.type === 'product' ? 'to-product' : ''}`;
+                
+                if (link.type === 'product') {
+                    line.setAttribute('marker-end', 'url(#arrow)');
+                }
+                
+                this.svgGraph.appendChild(line);
+            }
+        });
+
+        // Draw nodes
+        this.graphNodes.forEach(n => {
+            if (n.type === 'species') {
+                const currentConc = state[n.id] !== undefined ? state[n.id] : 0;
+                
+                // Scale radius logarithmically based on concentration
+                const r = 5.5 + Math.sqrt(Math.max(0, currentConc)) * 0.55;
+                const opacity = 0.35 + Math.min(100, currentConc) / 100 * 0.55;
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', n.x);
+                circle.setAttribute('cy', n.y);
+                circle.setAttribute('r', r);
+                circle.setAttribute('fill', n.color);
+                circle.setAttribute('fill-opacity', opacity);
+                circle.setAttribute('stroke', '#ffffff');
+                circle.setAttribute('stroke-opacity', 0.8);
+                circle.className.baseVal = 'crn-node-species';
+                
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = `${n.id}: ${currentConc.toFixed(2)} nM`;
+                circle.appendChild(title);
+
+                this.svgGraph.appendChild(circle);
+
+                // Add text label
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('x', n.x);
+                label.setAttribute('y', n.y + 2);
+                label.className.baseVal = 'crn-label';
+                label.textContent = n.id;
+                this.svgGraph.appendChild(label);
+            } else {
+                // Reaction node (small square)
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', n.x - 3);
+                rect.setAttribute('y', n.y - 3);
+                rect.setAttribute('width', 6);
+                rect.setAttribute('height', 6);
+                rect.className.baseVal = 'crn-node-reaction';
+                
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = `Reaction Junction: ${n.name}`;
+                rect.appendChild(title);
+                this.svgGraph.appendChild(rect);
+                
+                const rxLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                rxLabel.setAttribute('x', n.x);
+                rxLabel.setAttribute('y', n.y - 6);
+                rxLabel.className.baseVal = 'crn-rx-label';
+                rxLabel.textContent = n.name;
+                this.svgGraph.appendChild(rxLabel);
+            }
+        });
     }
 }
 
