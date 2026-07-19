@@ -1,7 +1,7 @@
 /**
  * Quantum Cryptography Lab - Application Logic & Visualization
  * Binds QKD physical models, Cascade reconciliation, E91 CHSH Bell parameters,
- * and Web Audio SFX to the GUI.
+ * Security Forensics, and Web Audio SFX to the GUI.
  */
 
 // Procedural Web Audio Synth Class
@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const wizardDescAlice = document.getElementById('wizard-desc-alice');
     const visualizerHeader = document.getElementById('visualizer-header');
     const aliceTag = document.getElementById('alice-tag');
-    const keyLabelReconciled = document.getElementById('key-label-reconciled');
+    let keyLabelReconciled = document.getElementById('key-label-reconciled');
     
     // Table Headers
     const thAliceBasis = document.getElementById('th-alice-basis');
@@ -292,26 +292,22 @@ document.addEventListener('DOMContentLoaded', () => {
         qkd.protocol = proto;
         logConsole(`Protocol switched to ${proto}.`);
         
-        // Dynamic elements configuration based on protocol selection
         if (proto === 'E91') {
-            // E91 Entanglement Specifics: hide prepare-and-measure parameters
             lightSourceContainer.style.display = 'none';
             muContainer.style.display = 'none';
             decoyContainer.style.display = 'none';
             
-            // Adjust label texts
             wizardTitleAlice.textContent = '1. EPR Source';
             wizardDescAlice.textContent = 'Singlet Pairs';
             visualizerHeader.textContent = 'Quantum Channel Visualizer (E91 Entangled Singlet Source)';
             aliceTag.textContent = 'Alice Detectors';
-            keyLabelReconciled = 'Reconciled Shared Key (Bob inverted)';
+            if (keyLabelReconciled) keyLabelReconciled.textContent = 'Reconciled Shared Key (Bob inverted)';
             
             thAliceBasis.textContent = 'Alice Basis (1/2/3)';
             thBobBasis.textContent = 'Bob Basis (1/2/3)';
             thAnnouncement.textContent = 'Correlation State Pair';
             statQberLabel.textContent = 'Bell S / QBER';
             
-            // Remove PNS (only works on coherent pulses)
             for (let i = 0; i < eveStrategySelect.options.length; i++) {
                 if (eveStrategySelect.options[i].value === 'pns') {
                     eveStrategySelect.options[i].disabled = true;
@@ -319,7 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (eveStrategySelect.value === 'pns') eveStrategySelect.value = 'intercept_resend';
         } else {
-            // Restore layouts
             lightSourceContainer.style.display = 'block';
             if (sourceModeSelect.value === 'wcp') {
                 muContainer.style.display = 'block';
@@ -330,14 +325,13 @@ document.addEventListener('DOMContentLoaded', () => {
             wizardDescAlice.textContent = 'Alice Pulses';
             visualizerHeader.textContent = 'Quantum Channel Visualizer';
             aliceTag.textContent = 'Alice Laser';
-            keyLabelReconciled = 'Reconciled Shared Secret Key';
+            if (keyLabelReconciled) keyLabelReconciled.textContent = 'Reconciled Shared Secret Key';
             
             thAliceBasis.textContent = 'Alice Basis';
             thBobBasis.textContent = 'Bob Basis';
             thAnnouncement.textContent = 'SARG Set / B92 State';
             statQberLabel.textContent = 'Estimated QBER';
             
-            // Re-enable PNS
             for (let i = 0; i < eveStrategySelect.options.length; i++) {
                 if (eveStrategySelect.options[i].value === 'pns') {
                     eveStrategySelect.options[i].disabled = false;
@@ -583,6 +577,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Security Forensics assessor
+    function runSecurityForensics() {
+        const sigEl = document.getElementById('forensic-signature');
+        const countEl = document.getElementById('forensic-countermeasure');
+        
+        if (!qkd.evePresent) {
+            sigEl.textContent = `No active eavesdropping signatures detected. Channel noise aligns within normal fiber link margins (Estimated QBER: ${(qkd.qber*100).toFixed(1)}%). Link is secure.`;
+            sigEl.style.color = 'var(--neon-green)';
+            sigEl.style.textShadow = 'var(--glow-green)';
+            sigEl.style.borderColor = 'rgba(0, 255, 135, 0.15)';
+            
+            countEl.textContent = "Parity reconciliation completed. Secure key is verified and safe for symmetric key distributions (e.g. AES-256 payload encryption).";
+            countEl.style.color = 'var(--neon-cyan)';
+            countEl.style.textShadow = 'var(--glow-cyan)';
+            countEl.style.borderColor = 'rgba(0, 242, 254, 0.15)';
+            return;
+        }
+        
+        // Threat styles
+        sigEl.style.color = 'var(--neon-orange)';
+        sigEl.style.textShadow = 'var(--glow-orange)';
+        sigEl.style.borderColor = 'rgba(255, 125, 0, 0.2)';
+        
+        countEl.style.color = 'var(--neon-cyan)';
+        countEl.style.textShadow = 'var(--glow-cyan)';
+        countEl.style.borderColor = 'rgba(0, 242, 254, 0.2)';
+        
+        if (qkd.protocol === 'E91') {
+            sigEl.textContent = `CRITICAL DETECT: EPR Bell S-parameter S = ${qkd.e91BellS.toFixed(3)} <= 2.0. Entangled singlet state projection collapsed by local coordinate measurement intercepts.`;
+            countEl.textContent = "ABORT ACTION: Entanglement collapsed. Terminate current link session. Audit line nodes for active fiber tap installations or inline splitters.";
+            countEl.style.color = 'var(--neon-pink)';
+            countEl.style.textShadow = 'var(--glow-pink)';
+            countEl.style.borderColor = 'rgba(255, 0, 120, 0.2)';
+        } else if (qkd.eveStrategy === 'pns') {
+            if (qkd.decoyStatesEnabled) {
+                sigEl.textContent = `Photon Number Splitting (PNS) attack signature profile identified. Multi-photon pulse splitting detected, but Decoy States are active. Single-photon yield estimates are secure.`;
+                countEl.textContent = "Countermeasure successful: Decoy states validate link safety. Reconciled key is secure to use.";
+                sigEl.style.color = 'var(--neon-green)';
+                sigEl.style.textShadow = 'var(--glow-green)';
+                sigEl.style.borderColor = 'rgba(0, 255, 135, 0.15)';
+            } else {
+                sigEl.textContent = `CRITICAL THREAT: PNS attack signature profile identified. Eavesdropper is splitting multi-photon pulses. Without decoy states, Eve learns key bits with zero disturbance.`;
+                countEl.textContent = "ABORT ACTION: Terminate current session. Activate the Decoy State Protocol (SIGNAL/DECOY/VACUUM) to bound multi-photon splitting leaks.";
+                countEl.style.color = 'var(--neon-pink)';
+                countEl.style.textShadow = 'var(--glow-pink)';
+                countEl.style.borderColor = 'rgba(255, 0, 120, 0.2)';
+            }
+        } else if (qkd.eveStrategy === 'intercept_resend') {
+            sigEl.textContent = `CRITICAL THREAT: High disturbance signature detected (QBER: ${(qkd.qber*100).toFixed(1)}% >= 11%). Intercept & Resend attack active. Polarizations collapsed to Eve's random bases.`;
+            countEl.textContent = "Standard QKD protocol response triggered: Key discarded due to alignment errors. Relocate line optical fibers or audit nodes for intercept hardware.";
+            countEl.style.color = 'var(--neon-pink)';
+            countEl.style.textShadow = 'var(--glow-pink)';
+            countEl.style.borderColor = 'rgba(255, 0, 120, 0.2)';
+        } else if (qkd.eveStrategy === 'weak_measurement') {
+            sigEl.textContent = `Eavesdropper Weak Measurement signature detected. QBER is artificially kept low (QBER: ${(qkd.qber*100).toFixed(1)}% < 11%), but partial key leakage (~35%) is confirmed.`;
+            countEl.textContent = "Privacy amplification compression ratio increased. Reduced secure key rate but successfully compressed Eve's information gain to zero.";
+        }
+    }
+    
     // Particle Explosion helper
     class Particle {
         constructor(x, y, color) {
@@ -697,7 +750,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // 5. Eve
-        // For E91, Eve intercepts between EPR source and Bob
         const eveX = qkd.protocol === 'E91' ? (midX + receiverX) / 2 : (transmitterX + receiverX) / 2;
         if (qkd.evePresent) {
             ctx.save();
@@ -727,7 +779,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 photon.x += photon.speed;
                 const distanceFactor = qkd.distance / 120;
                 
-                // Attenuation loss test
                 if (Math.abs(photon.x - midX) > 40 && Math.abs(photon.x - midX) < (receiverX - midX - 20)) {
                     if (Math.random() < 0.0012 * distanceFactor) {
                         photon.absorbed = true;
@@ -743,10 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Eve Intercept
             if (qkd.evePresent && !photon.intercepted && !photon.absorbed) {
-                // Determine collision bounds
                 const reachedEve = (photon.speed > 0) ? (photon.x >= eveX) : (photon.x <= eveX);
-                
-                // In E91, Eve intercepts the photon travelling to Bob (positive speed)
                 if (reachedEve && ((qkd.protocol === 'E91' && photon.speed > 0) || qkd.protocol !== 'E91')) {
                     photon.intercepted = true;
                     photon.color = 'var(--neon-orange)';
@@ -756,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // Receive bounds check (Left bounds for Alice in E91, Right bounds for Bob)
+            // Receive bounds check
             const reachedBob = (photon.speed > 0 && photon.x >= receiverX);
             const reachedAliceE91 = (qkd.protocol === 'E91' && photon.speed < 0 && photon.x <= transmitterX);
             
@@ -785,7 +833,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         logConsole(`Bob: No click registered for Pair #${photon.index + 1}`);
                     }
                 } else if (reachedAliceE91) {
-                    // Alice receives her entangled photon
                     createExplosion(transmitterX, middleY, photon.color, 6);
                     const basisVal = simulationResults.aliceBases[photon.index];
                     const bitVal = simulationResults.aliceBits[photon.index];
@@ -807,7 +854,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.arc(photon.x, photon.y, photon.size, 0, Math.PI * 2);
             ctx.fill();
             
-            // Draw polarization vector line
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -852,7 +898,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (qkd.protocol === 'B92') {
                 angle = (bit === 0) ? 0 : Math.PI / 4;
             } else if (qkd.protocol === 'E91') {
-                // Map bases indices 1,2,3 to visual angle representations
                 const bNum = parseInt(basis);
                 angle = (bNum - 1) * Math.PI / 4;
             } else {
@@ -866,14 +911,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = (basis === BASES.RECTILINEAR || basis === '1' || basis === '3') ? 'var(--neon-cyan)' : 'var(--neon-purple)';
             
             if (qkd.protocol === 'E91') {
-                // Entangled photons travel outwards from the center source (midX)
-                // Left-moving photon to Alice
                 photons.push({
                     index: i,
                     x: midX + (i * spacing),
                     y: middleY,
                     size: 7,
-                    speed: -3.5, // negative speed
+                    speed: -3.5,
                     angle: angle,
                     color: color,
                     basis: basis,
@@ -883,13 +926,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     absorbed: false,
                     alpha: 1.0
                 });
-                // Right-moving photon to Bob
                 photons.push({
                     index: i,
                     x: midX - (i * spacing),
                     y: middleY,
                     size: 7,
-                    speed: 3.5, // positive speed
+                    speed: 3.5,
                     angle: angle,
                     color: color,
                     basis: basis,
@@ -900,7 +942,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     alpha: 1.0
                 });
             } else {
-                // Prepare-and-measure standard flow (Alice to Bob)
                 photons.push({
                     index: i,
                     x: transmitterX - (i * spacing),
@@ -1013,7 +1054,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         drawCurve(data.ideal, 'var(--neon-cyan)');
         
-        // Hide WCP decoy curves under E91 as it relies strictly on single-photon EPR pairs
         if (qkd.protocol !== 'E91') {
             drawCurve(data.wcpDecoy, 'var(--neon-purple)');
             drawCurve(data.wcpNoDecoy, 'var(--neon-orange)');
@@ -1142,6 +1182,10 @@ document.addEventListener('DOMContentLoaded', () => {
             qkd.applyPrivacyAmplification();
             updateStatsRow();
             renderFinalKeys();
+            
+            // Evaluate active security forensics
+            runSecurityForensics();
+            
             checkChallengeOutcomes();
             logConsole("Phase 5: Privacy amplification done. Key rate verified.", 'success');
         }
@@ -1164,10 +1208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const qberVal = qkd.qber * 100;
             
             if (qkd.protocol === 'E91') {
-                // Render Bell S next to QBER
                 statQber.textContent = `S: ${qkd.e91BellS.toFixed(2)} | QBER: ${qberVal.toFixed(0)}%`;
                 
-                // Bell inequality holds if S > 2.0. If S <= 2.1 under Eve presence, it is compromised.
                 const isCompromised = (qkd.secureKey.length === 0);
                 if (isCompromised) {
                     statStatus.textContent = "COLLAPSED (S <= 2)";
@@ -1274,7 +1316,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 symbolChar = qkd.aliceBits[i] === 0 ? '→' : '↗';
                 symbolClass = qkd.aliceBits[i] === 0 ? 'symbol-rect' : 'symbol-diag';
             } else if (qkd.protocol === 'E91') {
-                // Display the theoretical angle degrees
                 const bNum = parseInt(aBasis);
                 const angleDeg = (bNum - 1) * 45;
                 symbolChar = `${angleDeg}°`;
@@ -1299,7 +1340,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdAnnouncement.textContent = qkd.aliceBits[i] === 0 ? 'H (Rect 0)' : 'D (Diag 1)';
                 tdAnnouncement.style.color = 'var(--text-secondary)';
             } else if (qkd.protocol === 'E91') {
-                // Bell pair singlet representation
                 tdAnnouncement.textContent = '|Ψ⁻⟩ Singlet';
                 tdAnnouncement.style.color = 'var(--neon-cyan)';
             } else {
@@ -1423,6 +1463,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
+        // Evaluate security forensics
+        runSecurityForensics();
+        
         checkChallengeOutcomes();
         
         logConsole("Physics QKD simulation complete. Statistical results verified.", "success");
@@ -1450,7 +1493,6 @@ document.addEventListener('DOMContentLoaded', () => {
             qkd.eveStrategy = eveStrategySelect.value;
             qkd.protocol = protocolSelect.value;
             
-            // Sync sliders
             const dcExp = darkCountSlider.value;
             qkd.darkCountRate = Math.pow(10, -parseInt(dcExp));
             qkd.errorCorrectionEfficiency = parseFloat(fEfficiencySlider.value);
@@ -1503,6 +1545,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 steps.forEach(s => s.classList.remove('active', 'completed'));
                 steps[0].classList.add('active');
                 stateTableBody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">No simulation data available. Click "Run Full Simulation" to generate states.</td></tr>`;
+                
+                // Clear forensics on reset
+                document.getElementById('forensic-signature').textContent = "No forensic data available. Run simulation to execute.";
+                document.getElementById('forensic-signature').style.color = 'var(--text-secondary)';
+                document.getElementById('forensic-signature').style.textShadow = 'none';
+                document.getElementById('forensic-signature').style.borderColor = 'rgba(255,255,255,0.05)';
+                document.getElementById('forensic-countermeasure').textContent = "No recommendation.";
+                document.getElementById('forensic-countermeasure').style.color = 'var(--text-secondary)';
+                document.getElementById('forensic-countermeasure').style.textShadow = 'none';
+                document.getElementById('forensic-countermeasure').style.borderColor = 'rgba(255,255,255,0.05)';
+                
                 btnStep.textContent = "Start Step-by-Step";
                 logConsole("Simulation workspace reset.");
             }
