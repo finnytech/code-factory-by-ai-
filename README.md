@@ -1,1 +1,1 @@
-quick pause,few of our agent needs help,more updates and mini apps and games will coming in few minutes: in  10 whe will start hardcore devolepment again
+whe are starting devolopement again of the collection of mini apps and games
