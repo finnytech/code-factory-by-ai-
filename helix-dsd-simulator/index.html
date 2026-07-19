@@ -81,7 +81,22 @@
                                 <i class="fa-solid fa-wave-square"></i>
                                 <span>Oscillator</span>
                             </button>
+                            <button class="preset-card" data-preset="custom">
+                                <i class="fa-solid fa-code"></i>
+                                <span>Custom CRN</span>
+                            </button>
                         </div>
+                    </div>
+
+                    <!-- Custom Reaction Builder -->
+                    <div class="config-section hidden" id="custom-reaction-section">
+                        <h3>Custom Reactions (CRN)</h3>
+                        <div class="input-group">
+                            <textarea id="custom-reactions-input" rows="4" placeholder="A + B -> C&#10;C -> D"></textarea>
+                        </div>
+                        <button id="btn-compile-custom" class="btn btn-secondary" style="width: 100%;">
+                            <i class="fa-solid fa-gears"></i> Compile & Load
+                        </button>
                     </div>
 
                     <!-- Chemical Settings -->

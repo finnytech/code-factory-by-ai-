@@ -13,6 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const simStatusIndicator = document.getElementById('sim-status-indicator');
     const simStatusText = document.getElementById('sim-status-text');
     
+    // Custom Reaction Panel Elements
+    const customReactionSection = document.getElementById('custom-reaction-section');
+    const customReactionsInput = document.getElementById('custom-reactions-input');
+    const btnCompileCustom = document.getElementById('btn-compile-custom');
+    
     // Sliders
     const paramTemp = document.getElementById('param-temp');
     const valTemp = document.getElementById('val-temp');
@@ -79,9 +84,26 @@ document.addEventListener('DOMContentLoaded', () => {
             
             stopSimulation();
             currentPreset = card.dataset.preset;
+            
+            if (currentPreset === 'custom') {
+                customReactionSection.classList.remove('hidden');
+                if (!customReactionsInput.value.trim()) {
+                    customReactionsInput.value = "A + B -> C\nC + D -> E\nE -> Inactive";
+                }
+            } else {
+                customReactionSection.classList.add('hidden');
+            }
+            
             loadPreset(currentPreset);
         });
     });
+
+    // Custom reaction compile trigger button
+    btnCompileCustom.addEventListener('click', () => {
+        stopSimulation();
+        loadPreset('custom', customReactionsInput.value);
+    });
+
 
     // UI Parameters Change listeners
     paramTemp.addEventListener('input', (e) => {
@@ -163,8 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load initial preset (OR Gate)
     loadPreset(currentPreset);
 
-    function loadPreset(presetName) {
-        compiledData = DNACompiler.compile(presetName);
+    function loadPreset(presetName, customText = '') {
+        compiledData = DNACompiler.compile(presetName, customText);
+        window.activeReactions = compiledData.reactions;
         
         // Populate inputs
         renderReactantInputs();
@@ -256,10 +279,23 @@ document.addEventListener('DOMContentLoaded', () => {
         schematicsViewer.innerHTML = '';
         compiledData.gates.forEach(gate => {
             const gateDiv = document.createElement('div');
-            gateDiv.className = 'schem-gate';
+            gateDiv.className = 'svg-gate-card';
+            
+            // Look up matching species structure in compiledData
+            const matchingSp = compiledData.species.find(sp => 
+                (sp.type === 'gate' || sp.type === 'gate_active') && 
+                (gate.name.toLowerCase().includes(sp.name.toLowerCase()) || 
+                 sp.name.toLowerCase().includes(gate.name.toLowerCase()) ||
+                 gate.name.toLowerCase().includes(sp.id.toLowerCase()))
+            );
+            
+            const structure = matchingSp ? matchingSp.structure : '';
+            const svgMarkup = renderer.renderGateSVG(gate.name, structure);
+            
             gateDiv.innerHTML = `
-                <div class="schem-title">${gate.name}</div>
-                <pre>${gate.layout}</pre>
+                <div class="svg-gate-title">${gate.name}</div>
+                ${svgMarkup}
+                <pre style="margin-top: 0.6rem; font-size: 0.65rem; opacity: 0.45; font-family: var(--font-mono); line-height: 1.35;">${gate.layout}</pre>
             `;
             schematicsViewer.appendChild(gateDiv);
         });

@@ -22,7 +22,7 @@ const DNACompiler = {
     },
 
     // Compile preset logical circuits
-    compile(presetName) {
+    compile(presetName, customReactionsText) {
         const result = {
             preset: presetName,
             reactions: [],
@@ -215,7 +215,274 @@ const DNACompiler = {
                     layout: 'Top:                     < ty  dy >< ty  dy >\n              ===============================\nBottom:  [ dx*  tx*  dy*  ty* ]'
                 }
             ];
+        } else if (presetName === 'custom') {
+            const text = customReactionsText || 'A + B -> C';
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            
+            const rawSpecies = new Set();
+            const parsedReactions = [];
+            
+            lines.forEach((line, lineIdx) => {
+                const parts = line.split(/->|→/);
+                if (parts.length !== 2) return;
+                
+                const leftStr = parts[0].trim();
+                const rightStr = parts[1].trim();
+                
+                const reactants = leftStr.split('+').map(s => s.trim()).filter(s => s.length > 0);
+                const products = rightStr.split('+').map(s => s.trim()).filter(s => s.length > 0);
+                
+                if (reactants.length === 0) return;
+                
+                reactants.forEach(r => rawSpecies.add(r));
+                products.forEach(p => {
+                    if (p.toLowerCase() !== 'inactive') {
+                        rawSpecies.add(p);
+                    }
+                });
+                
+                parsedReactions.push({ reactants, products, rawLine: line });
+            });
+            
+            if (rawSpecies.size === 0) {
+                rawSpecies.add('A');
+                rawSpecies.add('B');
+                rawSpecies.add('C');
+                parsedReactions.push({ reactants: ['A', 'B'], products: ['C'], rawLine: 'A + B -> C' });
+            }
+            
+            const colorPalette = ['#06b6d4', '#a78bfa', '#10b981', '#f59e0b', '#fb7185', '#e11d48', '#38bdf8', '#fb923c', '#c084fc', '#84cc16'];
+            let colorIdx = 0;
+            
+            const speciesMap = {};
+            const speciesList = [];
+            rawSpecies.forEach(spName => {
+                const color = colorPalette[colorIdx % colorPalette.length];
+                colorIdx++;
+                
+                const spObj = {
+                    id: spName,
+                    name: `Strand ${spName}`,
+                    init: spName === 'A' || spName === 'X' ? 100 : (spName === 'B' || spName === 'Y' ? 80 : 0),
+                    color: color,
+                    type: 'strand',
+                    domains: [`t_${spName.toLowerCase()}`, `d_${spName.toLowerCase()}`]
+                };
+                speciesList.push(spObj);
+                speciesMap[spName] = spObj;
+            });
+            
+            const compiledReactions = [];
+            const compiledGates = [];
+            
+            parsedReactions.forEach((rx, idx) => {
+                const rxId = idx + 1;
+                if (rx.reactants.length === 1 && rx.products.length === 1 && rx.products[0].toLowerCase() !== 'inactive') {
+                    const r = rx.reactants[0];
+                    const p = rx.products[0];
+                    
+                    const gateId = `G_rx${rxId}`;
+                    const spentId = `S_rx${rxId}`;
+                    
+                    speciesList.push({
+                        id: gateId,
+                        name: `Gate ${r}→${p}`,
+                        init: 120,
+                        color: '#f59e0b',
+                        type: 'gate',
+                        structure: `[d_${r.toLowerCase()}* t_${r.toLowerCase()}*] <t_${p.toLowerCase()} d_${p.toLowerCase()}>`,
+                        domains: [`t_${r.toLowerCase()}`, `d_${r.toLowerCase()}`, `t_${p.toLowerCase()}`, `d_${p.toLowerCase()}`]
+                    });
+                    
+                    speciesList.push({
+                        id: spentId,
+                        name: `Spent ${r}→${p}`,
+                        init: 0,
+                        color: '#4b5563',
+                        type: 'spent',
+                        domains: [`t_${r.toLowerCase()}`, `d_${r.toLowerCase()}`]
+                    });
+                    
+                    compiledReactions.push({
+                        reactants: [r, gateId],
+                        products: [spentId, p],
+                        rateKey: 'k1',
+                        type: 'displacement',
+                        label: `${r} + ${gateId} → ${p} + ${spentId}`
+                    });
+                    
+                    compiledGates.push({
+                        name: `Gate ${r}→${p}`,
+                        layout: `Top:          < t_${p.toLowerCase()}  d_${p.toLowerCase()} >\n              ===================\nBottom:  [ d_${r.toLowerCase()}*  t_${r.toLowerCase()}* ]`
+                    });
+                    
+                } else if (rx.reactants.length === 1 && (rx.products.length === 0 || rx.products[0].toLowerCase() === 'inactive')) {
+                    const r = rx.reactants[0];
+                    const gateId = `G_decay_rx${rxId}`;
+                    const spentId = `S_decay_rx${rxId}`;
+                    
+                    speciesList.push({
+                        id: gateId,
+                        name: `Decay Gate ${r}`,
+                        init: 120,
+                        color: '#e11d48',
+                        type: 'gate',
+                        structure: `[d_${r.toLowerCase()}* t_${r.toLowerCase()}*] <empty>`,
+                        domains: [`t_${r.toLowerCase()}`, `d_${r.toLowerCase()}`]
+                    });
+                    
+                    speciesList.push({
+                        id: spentId,
+                        name: `Spent Decay ${r}`,
+                        init: 0,
+                        color: '#374151',
+                        type: 'spent',
+                        domains: [`t_${r.toLowerCase()}`, `d_${r.toLowerCase()}`]
+                    });
+                    
+                    compiledReactions.push({
+                        reactants: [r, gateId],
+                        products: [spentId],
+                        rateKey: 'k1',
+                        type: 'decay',
+                        label: `${r} + ${gateId} → ${spentId} (Decay)`
+                    });
+                    
+                    compiledGates.push({
+                        name: `Decay Gate ${r}`,
+                        layout: `Top:          < empty >\n              ===================\nBottom:  [ d_${r.toLowerCase()}*  t_${r.toLowerCase()}* ]`
+                    });
+                    
+                } else if (rx.reactants.length === 2) {
+                    const r1 = rx.reactants[0];
+                    const r2 = rx.reactants[1];
+                    const p = rx.products[0] || 'Inactive';
+                    const isAnnihilation = p.toLowerCase() === 'inactive';
+                    
+                    if (isAnnihilation) {
+                        const gateId = `G_ann_rx${rxId}`;
+                        const spentId = `S_ann_rx${rxId}`;
+                        
+                        speciesList.push({
+                            id: gateId,
+                            name: `Annihilation ${r1}+${r2}`,
+                            init: 120,
+                            color: '#64748b',
+                            type: 'gate',
+                            structure: `[d_${r1.toLowerCase()}* t_${r1.toLowerCase()}* d_${r2.toLowerCase()}* t_${r2.toLowerCase()}*] <empty>`,
+                            domains: [`t_${r1.toLowerCase()}`, `d_${r1.toLowerCase()}`, `t_${r2.toLowerCase()}`, `d_${r2.toLowerCase()}`]
+                        });
+                        
+                        speciesList.push({
+                            id: spentId,
+                            name: `Spent Annihilation`,
+                            init: 0,
+                            color: '#1e293b',
+                            type: 'spent',
+                            domains: []
+                        });
+                        
+                        compiledReactions.push({
+                            reactants: [r1, r2, gateId],
+                            products: [spentId],
+                            rateKey: 'k1',
+                            type: 'annihilation',
+                            label: `${r1} + ${r2} + ${gateId} → ${spentId} (Annihilation)`
+                        });
+                        
+                        compiledGates.push({
+                            name: `Annihilation Gate ${r1}+${r2}`,
+                            layout: `Top:          < empty >\n              =========================================\nBottom:  [ d_${r1.toLowerCase()}*  t_${r1.toLowerCase()}*  d_${r2.toLowerCase()}*  t_${r2.toLowerCase()}* ]`
+                        });
+                    } else {
+                        const intId = `Int_rx${rxId}`;
+                        const gate1Id = `G1_rx${rxId}`;
+                        const gate2Id = `G2_rx${rxId}`;
+                        const gate2ActiveId = `G2_act_rx${rxId}`;
+                        const spent1Id = `S1_rx${rxId}`;
+                        const spent2Id = `S2_rx${rxId}`;
+                        
+                        speciesList.push({
+                            id: intId,
+                            name: `Int ${r1}+${r2}`,
+                            init: 0,
+                            color: '#fb923c',
+                            type: 'strand',
+                            domains: [`t_int${rxId}`, `d_int${rxId}`]
+                        });
+                        
+                        speciesList.push({
+                            id: gate1Id,
+                            name: `Gate1 ${r1}+${r2}`,
+                            init: 120,
+                            color: '#fb923c',
+                            type: 'gate',
+                            structure: `[d_${r1.toLowerCase()}* t_${r1.toLowerCase()}*] <t_int${rxId} d_int${rxId}>`,
+                            domains: [`t_${r1.toLowerCase()}`, `d_${r1.toLowerCase()}`, `t_int${rxId}`, `d_int${rxId}`]
+                        });
+                        
+                        speciesList.push({
+                            id: gate2Id,
+                            name: `Gate2 ${r1}+${r2}`,
+                            init: 120,
+                            color: '#fb7185',
+                            type: 'gate',
+                            structure: `[d_int${rxId}* t_int${rxId}* d_${r2.toLowerCase()}* t_${r2.toLowerCase()}*] <t_${p.toLowerCase()} d_${p.toLowerCase()}>`,
+                            domains: [`t_int${rxId}`, `d_int${rxId}`, `t_${r2.toLowerCase()}`, `d_${r2.toLowerCase()}`, `t_${p.toLowerCase()}`, `d_${p.toLowerCase()}`]
+                        });
+                        
+                        speciesList.push({
+                            id: gate2ActiveId,
+                            name: `Gate2 Active`,
+                            init: 0,
+                            color: '#c084fc',
+                            type: 'gate_active',
+                            structure: `[d_${r2.toLowerCase()}* t_${r2.toLowerCase()}*] <t_${p.toLowerCase()} d_${p.toLowerCase()}>`,
+                            domains: [`t_${r2.toLowerCase()}`, `d_${r2.toLowerCase()}`, `t_${p.toLowerCase()}`, `d_${p.toLowerCase()}`]
+                        });
+                        
+                        speciesList.push({ id: spent1Id, name: `Spent G1 rx${rxId}`, init: 0, color: '#4b5563', type: 'spent' });
+                        speciesList.push({ id: spent2Id, name: `Spent G2 rx${rxId}`, init: 0, color: '#374151', type: 'spent' });
+                        
+                        compiledReactions.push({
+                            reactants: [r1, gate1Id],
+                            products: [spent1Id, intId],
+                            rateKey: 'k1',
+                            type: 'displacement',
+                            label: `${r1} + ${gate1Id} → ${intId} + ${spent1Id}`
+                        });
+                        compiledReactions.push({
+                            reactants: [intId, gate2Id],
+                            products: [gate2ActiveId],
+                            rateKey: 'k1',
+                            type: 'displacement_partial',
+                            label: `${intId} + ${gate2Id} → ${gate2ActiveId}`
+                        });
+                        compiledReactions.push({
+                            reactants: [r2, gate2ActiveId],
+                            products: [spent2Id, p],
+                            rateKey: 'k1',
+                            type: 'displacement',
+                            label: `${r2} + ${gate2ActiveId} → ${p} + ${spent2Id}`
+                        });
+                        
+                        compiledGates.push({
+                            name: `Gate 1 (Reacts with ${r1})`,
+                            layout: `Top:          < t_int${rxId}  d_int${rxId} >\n              ======================\nBottom:  [ d_${r1.toLowerCase()}*  t_${r1.toLowerCase()}* ]`
+                        });
+                        compiledGates.push({
+                            name: `Gate 2 (Reacts with ${r2} after Intermediate)`,
+                            layout: `Top:                     < t_${p.toLowerCase()}  d_${p.toLowerCase()} >\n              ======================================\nBottom:  [ d_int${rxId}*  t_int${rxId}*  d_${r2.toLowerCase()}*  t_${r2.toLowerCase()}* ]`
+                        });
+                    }
+                }
+            });
+            
+            result.species = speciesList;
+            result.reactions = compiledReactions;
+            result.gates = compiledGates;
         }
+
 
         // Map DNA strands / domains to concrete generated nucleotide sequences
         result.species.forEach(sp => {

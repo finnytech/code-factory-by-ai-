@@ -306,7 +306,7 @@ class DSDRenderer {
     }
 
     isMatchingPairs(strandId, gateId) {
-        // Quick rule mappings for visual reactions matching preset kinetics
+        // Hardcoded fallbacks for presets
         const matches = {
             'IA': 'G_AY', 'IB': 'G_BY',
             'IA': 'G1', 'Int': 'G2', 'IB': 'G2_active',
@@ -315,8 +315,17 @@ class DSDRenderer {
             'IA': 'G_sumA', 'IB': 'G_sumB', 'IA': 'G_sumInh',
             'X': 'Fuel1', 'Y': 'Fuel2', 'Y': 'Fuel3'
         };
-        return matches[strandId] === gateId;
+        if (matches[strandId] === gateId) return true;
+
+        // Dynamic chemical compatability matching for custom networks
+        if (window.activeReactions) {
+            return window.activeReactions.some(rx => 
+                rx.reactants.includes(strandId) && rx.reactants.includes(gateId)
+            );
+        }
+        return false;
     }
+
 
     // Find clicked particle to show details card
     handleCanvasClick(clientX, clientY) {
@@ -447,6 +456,88 @@ class DSDRenderer {
             `;
             this.legendContainer.appendChild(item);
         });
+    }
+
+    // Dynamic SVG gate schematic renderer
+    renderGateSVG(gateName, structureString) {
+        if (!structureString) return '';
+
+        // Extract domains
+        const bottomMatch = structureString.match(/\[(.*?)\]/);
+        const bottomDomains = bottomMatch ? bottomMatch[1].trim().split(/\s+/).filter(d => d !== '<empty>' && d !== '') : [];
+        
+        const topMatch = structureString.match(/<(.*?)>/);
+        const topDomains = topMatch ? topMatch[1].trim().split(/\s+/).filter(d => d !== 'empty' && d !== '') : [];
+
+        const maxDomains = Math.max(bottomDomains.length, topDomains.length, 1);
+        const domWidth = 55;
+        const startX = 40;
+        const svgWidth = Math.max(320, maxDomains * domWidth + 80);
+        const svgHeight = 85;
+
+        let svgHtml = `<svg class="svg-gate-canvas" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
+        
+        // Helper to get domain color
+        const getDomainColor = (dName) => {
+            const cleanName = dName.replace('*', '').replace('t_int', 't_int').replace('d_int', 'd_int');
+            // Check dynamic numbers
+            let lookName = cleanName;
+            if (cleanName.startsWith('t_int') && cleanName.length > 5) lookName = 't_int';
+            if (cleanName.startsWith('d_int') && cleanName.length > 5) lookName = 'd_int';
+            return this.domainColors[lookName] || '#8b5cf6';
+        };
+
+        const topY = 28;
+        const bottomY = 54;
+
+        // Draw top strand domains
+        if (topDomains.length > 0) {
+            const topLength = topDomains.length * domWidth;
+            const topShift = Math.max(0, bottomDomains.length - topDomains.length) * domWidth;
+            const topStartX = startX + topShift;
+            
+            svgHtml += `<line x1="${topStartX}" y1="${topY}" x2="${topStartX + topLength}" y2="${topY}" stroke="#9ca3af" stroke-width="1.5" />`;
+            
+            topDomains.forEach((d, idx) => {
+                const x = topStartX + idx * domWidth + domWidth / 2;
+                const dColor = getDomainColor(d);
+                const isToehold = d.startsWith('t');
+                
+                svgHtml += `<line x1="${topStartX + idx * domWidth + 4}" y1="${topY}" x2="${topStartX + (idx + 1) * domWidth - 4}" y2="${topY}" class="svg-domain-line" stroke="${dColor}" stroke-dasharray="${isToehold ? '3,3' : 'none'}" />`;
+                svgHtml += `<text x="${x}" y="${topY - 8}" fill="${dColor}" class="svg-domain-label">${d}</text>`;
+            });
+        }
+
+        // Draw bottom strand domains
+        if (bottomDomains.length > 0) {
+            const bottomLength = bottomDomains.length * domWidth;
+            svgHtml += `<line x1="${startX}" y1="${bottomY}" x2="${startX + bottomLength}" y2="${bottomY}" stroke="#9ca3af" stroke-width="1.5" />`;
+            
+            bottomDomains.forEach((d, idx) => {
+                const x = startX + idx * domWidth + domWidth / 2;
+                const dColor = getDomainColor(d);
+                const isToehold = d.startsWith('t');
+                
+                svgHtml += `<line x1="${startX + idx * domWidth + 4}" y1="${bottomY}" x2="${startX + (idx + 1) * domWidth - 4}" y2="${bottomY}" class="svg-domain-line" stroke="${dColor}" stroke-dasharray="${isToehold ? '3,3' : 'none'}" />`;
+                svgHtml += `<text x="${x}" y="${bottomY + 16}" fill="${dColor}" class="svg-domain-label">${d}</text>`;
+            });
+        }
+
+        // Draw base pairing lines
+        if (topDomains.length > 0 && bottomDomains.length > 0) {
+            const overlapCount = Math.min(topDomains.length, bottomDomains.length);
+            const topShift = Math.max(0, bottomDomains.length - topDomains.length) * domWidth;
+            
+            for (let i = 0; i < overlapCount; i++) {
+                const xCenter = startX + topShift + i * domWidth + domWidth / 2;
+                svgHtml += `<line x1="${xCenter - 4}" y1="${topY + 4}" x2="${xCenter - 4}" y2="${bottomY - 4}" stroke="rgba(255,255,255,0.25)" stroke-width="1" />`;
+                svgHtml += `<line x1="${xCenter}" y1="${topY + 4}" x2="${xCenter}" y2="${bottomY - 4}" stroke="rgba(255,255,255,0.25)" stroke-width="1" />`;
+                svgHtml += `<line x1="${xCenter + 4}" y1="${topY + 4}" x2="${xCenter + 4}" y2="${bottomY - 4}" stroke="rgba(255,255,255,0.25)" stroke-width="1" />`;
+            }
+        }
+
+        svgHtml += `</svg>`;
+        return svgHtml;
     }
 }
 
