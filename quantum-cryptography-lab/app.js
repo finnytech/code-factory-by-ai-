@@ -1,15 +1,169 @@
 /**
  * Quantum Cryptography Lab - Application Logic & Visualization
- * Binds QKD physical models and lab challenges to the GUI and renders animations & charts.
+ * Binds QKD physical models, challenges, and Web Audio SFX synthesis to the GUI.
  */
 
+// Procedural Web Audio Synth Class
+class SoundSynth {
+    constructor() {
+        this.enabled = true;
+        this.audioCtx = null;
+    }
+    
+    init() {
+        if (!this.audioCtx) {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
+    }
+    
+    playLaser() {
+        if (!this.enabled) return;
+        this.init();
+        
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, this.audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, this.audioCtx.currentTime + 0.15);
+        
+        gain.gain.setValueAtTime(0.03, this.audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.15);
+        
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        
+        osc.start();
+        osc.stop(this.audioCtx.currentTime + 0.16);
+    }
+    
+    playClick(freq = 1100) {
+        if (!this.enabled) return;
+        this.init();
+        
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+        
+        gain.gain.setValueAtTime(0.06, this.audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.08);
+        
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        
+        osc.start();
+        osc.stop(this.audioCtx.currentTime + 0.09);
+    }
+    
+    playLost() {
+        if (!this.enabled) return;
+        this.init();
+        
+        const bufferSize = this.audioCtx.sampleRate * 0.1; // 100ms
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(400, this.audioCtx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(80, this.audioCtx.currentTime + 0.1);
+        
+        const gain = this.audioCtx.createGain();
+        gain.gain.setValueAtTime(0.04, this.audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.1);
+        
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        
+        noise.start();
+        noise.stop(this.audioCtx.currentTime + 0.11);
+    }
+    
+    playAlarm() {
+        if (!this.enabled) return;
+        this.init();
+        
+        const now = this.audioCtx.currentTime;
+        const osc1 = this.audioCtx.createOscillator();
+        const osc2 = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        
+        osc1.type = 'triangle';
+        osc2.type = 'triangle';
+        
+        osc1.frequency.setValueAtTime(550, now);
+        osc1.frequency.linearRampToValueAtTime(750, now + 0.15);
+        osc1.frequency.linearRampToValueAtTime(550, now + 0.3);
+        
+        osc2.frequency.setValueAtTime(554, now);
+        osc2.frequency.linearRampToValueAtTime(754, now + 0.15);
+        osc2.frequency.linearRampToValueAtTime(554, now + 0.3);
+        
+        gain.gain.setValueAtTime(0.02, now);
+        gain.gain.linearRampToValueAtTime(0.02, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        
+        osc1.start();
+        osc2.start();
+        
+        osc1.stop(now + 0.31);
+        osc2.stop(now + 0.31);
+    }
+    
+    playSuccess() {
+        if (!this.enabled) return;
+        this.init();
+        
+        const now = this.audioCtx.currentTime;
+        const notes = [261.6, 329.6, 392.0, 523.3]; // C4, E4, G4, C5
+        
+        notes.forEach((freq, idx) => {
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            
+            const noteStart = now + idx * 0.12;
+            gain.gain.setValueAtTime(0.0, noteStart);
+            gain.gain.linearRampToValueAtTime(0.04, noteStart + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.45);
+            
+            osc.connect(gain);
+            gain.connect(this.audioCtx.destination);
+            
+            osc.start(noteStart);
+            osc.stop(noteStart + 0.5);
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Quantum Engine Module
+    // Initialize Quantum Engine & Synthesizer
     const qkd = new QKDModule();
+    const synth = new SoundSynth();
     
     // DOM Elements - Controls
     const btnRun = document.getElementById('btn-run');
     const btnStep = document.getElementById('btn-step');
+    const btnSound = document.getElementById('btn-sound');
+    
     const keyLengthSlider = document.getElementById('key-length-slider');
     const keyLengthVal = document.getElementById('key-length-val');
     const noiseSlider = document.getElementById('noise-slider');
@@ -77,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let simulationResults = null;
     
     // Challenge State
-    let activeChallenge = null; // 1, 2, or 3
+    let activeChallenge = null; 
     let challengeStatuses = [false, false, false];
     
     // Set Canvas Dimensions
@@ -102,6 +256,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', resizeCanvas);
     
     // Control Event Listeners & UI Toggles
+    btnSound.addEventListener('click', () => {
+        synth.enabled = !synth.enabled;
+        btnSound.innerHTML = synth.enabled ? `<span id="sound-icon">🔊</span> Procedural Sound: ON` : `<span id="sound-icon">🔇</span> Procedural Sound: OFF`;
+        synth.init();
+        logConsole(`Procedural sound synthesizer state set to ${synth.enabled ? 'ON' : 'OFF'}.`);
+    });
+    
     protocolSelect.addEventListener('change', (e) => {
         qkd.protocol = e.target.value;
         logConsole(`Protocol switched to ${qkd.protocol}.`);
@@ -162,6 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
         logConsole(`Eve strategy: ${qkd.eveStrategy.toUpperCase()}`);
     });
     
+    // Initial UI state
+    eveStrategyContainer.style.display = 'none';
+    
     // Console logger
     function logConsole(message, type = 'info') {
         const timestamp = new Date().toLocaleTimeString();
@@ -179,38 +343,35 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Challenge trigger activation
     function activateChallenge(id) {
-        // Clear active
         challenge1Card.classList.remove('active-mission');
         challenge2Card.classList.remove('active-mission');
         challenge3Card.classList.remove('active-mission');
         
-        // Reset badges (except solved ones)
         if (!challengeStatuses[0]) { badgeC1.className = 'challenge-badge badge-locked'; badgeC1.textContent = 'Incomplete'; }
         if (!challengeStatuses[1]) { badgeC2.className = 'challenge-badge badge-locked'; badgeC2.textContent = 'Incomplete'; }
         if (!challengeStatuses[2]) { badgeC3.className = 'challenge-badge badge-locked'; badgeC3.textContent = 'Incomplete'; }
         
         if (activeChallenge === id) {
-            // Toggle off
             activeChallenge = null;
             logConsole("Active mission cleared. Returning to free play mode.");
             return;
         }
         
         activeChallenge = id;
+        synth.init(); // enable audio context safely
         
         if (id === 1) {
             challenge1Card.classList.add('active-mission');
             badgeC1.className = 'challenge-badge badge-active';
             badgeC1.textContent = 'Active';
             
-            // Set starting link parameters to guide the user
             protocolSelect.value = 'BB84';
             distanceSlider.value = 55;
             distanceVal.textContent = '55 km';
             sourceModeSelect.value = 'wcp';
             muSlider.value = 0.5;
             muVal.textContent = '0.5';
-            decoyToggle.checked = false; // user has to turn it ON to solve!
+            decoyToggle.checked = false;
             eveToggle.checked = true;
             eveStrategySelect.value = 'pns';
             
@@ -219,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
             eveTag.style.display = 'block';
             eveStrategyContainer.style.display = 'block';
             
-            logConsole("MISSION 1 ACTIVE: Protect QKD at 55km distance. Observe why key drops to 0 under PNS attack. Solve by enabling Decoy States!", "warning");
+            logConsole("MISSION 1 ACTIVE: Secure QKD at 55km. PNS attack active. Turn Decoy states ON to bypass Eve!", "warning");
         } else if (id === 2) {
             challenge2Card.classList.add('active-mission');
             badgeC2.className = 'challenge-badge badge-active';
@@ -231,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceModeSelect.value = 'single_photon';
             decoyToggle.checked = false;
             eveToggle.checked = true;
-            eveStrategySelect.value = 'intercept_resend';
+            eveStrategySelect.value = 'weak_measurement'; // preset weak measurement!
             keyLengthSlider.value = 100;
             keyLengthVal.textContent = '100';
             
@@ -240,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
             eveTag.style.display = 'block';
             eveStrategyContainer.style.display = 'block';
             
-            logConsole("MISSION 2 ACTIVE: Play as Eve. Eavesdrop on Alice/Bob to read >15 bits of data, but avoid raising QBER >= 11% (which would drop the key). Adjust parameters to solve!", "warning");
+            logConsole("MISSION 2 ACTIVE: Eve must steal >15 bits, Bob QBER < 11%. Run under Weak Measurement to bypass defenses!", "warning");
         } else if (id === 3) {
             challenge3Card.classList.add('active-mission');
             badgeC3.className = 'challenge-badge badge-active';
@@ -258,10 +419,9 @@ document.addEventListener('DOMContentLoaded', () => {
             eveTag.style.display = 'none';
             eveStrategyContainer.style.display = 'none';
             
-            logConsole("MISSION 3 ACTIVE: Generate a secure B92 key. Switch to B92 protocol and run the simulation to calibrate sifting constraints.", "warning");
+            logConsole("MISSION 3 ACTIVE: Generate secure B92 key at 30km. Start simulation to verify sifting rates.", "warning");
         }
         
-        // Sync engine variables
         qkd.protocol = protocolSelect.value;
         qkd.distance = parseInt(distanceSlider.value);
         qkd.lightSourceMode = sourceModeSelect.value;
@@ -291,11 +451,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 challengeStatuses[0] = true;
                 badgeC1.className = 'challenge-badge badge-solved';
                 badgeC1.textContent = 'Solved';
-                logConsole("CHALLENGE SOLVED: Decoy states successfully estimated PNS thresholds and rescued the key rate!", "success");
+                synth.playSuccess(); // trigger arpeggio sound
+                logConsole("CHALLENGE SOLVED: Decoy states protected transmission under PNS attack!", "success");
                 activeChallenge = null;
                 challenge1Card.classList.remove('active-mission');
             } else {
-                logConsole("Mission 1 Incomplete: Key compromised or distance/settings incorrect.", "error");
+                logConsole("Mission 1 Incomplete: Key rate drop to 0 or decoy states disabled.", "error");
             }
         } else if (activeChallenge === 2) {
             const eveBitsRead = qkd.eveLearnedInfo.filter(info => info === 1).length;
@@ -305,7 +466,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 challengeStatuses[1] = true;
                 badgeC2.className = 'challenge-badge badge-solved';
                 badgeC2.textContent = 'Solved';
-                logConsole(`CHALLENGE SOLVED: Eve stole ${eveBitsRead} bits without raising QBER above Bob's threshold!`, "success");
+                synth.playSuccess(); // success sound
+                logConsole(`CHALLENGE SOLVED: Eve successfully intercepted ${eveBitsRead} bits without raising QBER over 11%.`, "success");
                 activeChallenge = null;
                 challenge2Card.classList.remove('active-mission');
             } else {
@@ -318,19 +480,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 challengeStatuses[2] = true;
                 badgeC3.className = 'challenge-badge badge-solved';
                 badgeC3.textContent = 'Solved';
-                logConsole("CHALLENGE SOLVED: B92 transmission successfully calibrated!", "success");
+                synth.playSuccess(); // success sound
+                logConsole("CHALLENGE SOLVED: B92 key successfully established!", "success");
                 activeChallenge = null;
                 challenge3Card.classList.remove('active-mission');
             } else {
-                logConsole("Mission 3 Incomplete: Check sifting calibrations under B92.", "error");
+                logConsole("Mission 3 Incomplete: Check B92 sifting alignments.", "error");
             }
         }
     }
     
     // Particle Explosion helper
-    class ParticleExplosion {
+    class Particle {
         constructor(x, y, color) {
-            createExplosion(x, y, color, 12);
+            this.x = x;
+            this.y = y;
+            this.color = color;
+            this.vx = (Math.random() - 0.5) * 5;
+            this.vy = (Math.random() - 0.5) * 5;
+            this.alpha = 1;
+            this.size = Math.random() * 3 + 1;
+            this.decay = Math.random() * 0.04 + 0.015;
+        }
+        
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.alpha -= this.decay;
+        }
+        
+        draw(c) {
+            c.save();
+            c.globalAlpha = this.alpha;
+            c.beginPath();
+            c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            c.fillStyle = this.color;
+            c.fill();
+            c.restore();
+        }
+    }
+    
+    function createExplosion(x, y, color, count = 12) {
+        for (let i = 0; i < count; i++) {
+            particles.push(new Particle(x, y, color));
         }
     }
     
@@ -338,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // 1. Draw fiber channel line
+        // 1. Fiber channel
         ctx.save();
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
         ctx.lineWidth = 10;
@@ -424,6 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (Math.random() < 0.0012 * distanceFactor) {
                         photon.absorbed = true;
                         createExplosion(photon.x, photon.y, 'rgba(255, 255, 255, 0.2)', 4);
+                        synth.playLost(); // trigger procedural fade sound
                     }
                 }
             } else {
@@ -443,6 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     photon.color = 'var(--neon-orange)';
                     createExplosion(midX, middleY, 'var(--neon-orange)', 12);
+                    synth.playAlarm(); // trigger procedural siren alarm
                     logConsole(`Pulse #${photon.index + 1}: Intercepted and measured by Eve in basis ${simulationResults.eveBases[photon.index]}`, 'warning');
                 }
             }
@@ -461,6 +655,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         matchText = (simulationResults.aliceBases[photon.index] === basisVal) ? 'sifted match' : 'basis mismatch';
                     }
+                    
+                    // Procedural click ping sound - pitch scaled based on basis
+                    const clickFreq = (basisVal === BASES.RECTILINEAR) ? 1150 : 1350;
+                    synth.playClick(clickFreq);
+                    
                     logConsole(`Bob detected click for Pulse #${photon.index + 1} (${basisVal}) -> Bit ${bitVal} (${matchText})`);
                 } else {
                     createExplosion(receiverX, middleY, 'rgba(255,255,255,0.05)', 3);
@@ -531,6 +730,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const count = simulationResults.aliceBits.length;
         const spacing = 45;
         
+        // Play procedural laser swoop
+        synth.playLaser();
+        
         for (let i = 0; i < count; i++) {
             const bit = simulationResults.aliceBits[i];
             const basis = simulationResults.aliceBases[i];
@@ -538,7 +740,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let angle = 0;
             if (qkd.protocol === 'B92') {
-                // B92 encodes 0 as H (0 deg), 1 as D (45 deg)
                 angle = (bit === 0) ? 0 : Math.PI / 4;
             } else {
                 if (basis === BASES.RECTILINEAR) {
@@ -659,7 +860,6 @@ document.addEventListener('DOMContentLoaded', () => {
         drawCurve(data.wcpDecoy, 'var(--neon-purple)');
         drawCurve(data.wcpNoDecoy, 'var(--neon-orange)');
         
-        // Dot marker
         const currD = qkd.distance;
         const tempModule = new QKDModule();
         tempModule.detectorEfficiency = qkd.detectorEfficiency;
@@ -667,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tempModule.fiberAttenuation = qkd.fiberAttenuation;
         tempModule.meanPhotonNumber = qkd.meanPhotonNumber;
         tempModule.noiseLevel = qkd.noiseLevel;
-        tempModule.protocol = qkd.protocol; // track protocol factor!
+        tempModule.protocol = qkd.protocol;
         
         const currRates = tempModule.calculateTheoreticalKeyRates([currD]);
         let currR = 0;
@@ -727,7 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.restore();
     }
     
-    // Set Active Wizard Step
+    // Set Active wizard step
     function goToStep(stepIndex) {
         currentStep = stepIndex;
         steps.forEach((s, idx) => {
@@ -741,6 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logConsole(`Phase 1: Alice prepared ${qkd.protocol} state streams.`);
         } else if (currentStep === 1) {
             btnStep.textContent = "Bob Detects Pulses";
+            synth.init(); // enable AudioContext on user interaction
             launchPhotonStream();
         } else if (currentStep === 2) {
             btnStep.textContent = "Sift Bases";
@@ -758,12 +959,12 @@ document.addEventListener('DOMContentLoaded', () => {
             qkd.applyPrivacyAmplification();
             updateStatsRow();
             renderFinalKeys();
-            checkChallengeOutcomes(); // Check challenge outcomes!
+            checkChallengeOutcomes();
             logConsole("Phase 5: Privacy amplification done. Key rate verified.", 'success');
         }
     }
     
-    // Update yield and error rates
+    // Update stats
     function updateStatsRow() {
         if (currentStep < 2) {
             statYield.textContent = "-";
@@ -968,6 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnRun.addEventListener('click', () => {
         isStepMode = false;
         cancelAnimationFrame(animationFrameId);
+        synth.init(); // Activate synthesizer AudioContext on user gesture
         
         const size = parseInt(keyLengthSlider.value);
         const noise = parseFloat(noiseSlider.value) / 100;
@@ -986,13 +1188,15 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTableData(true);
         renderFinalKeys();
         drawChart();
-        checkChallengeOutcomes(); // Check challenge outcomes!
+        checkChallengeOutcomes();
         
         logConsole("Physics QKD simulation complete. Statistical results verified.", "success");
     });
     
     // Step by Step button
     btnStep.addEventListener('click', () => {
+        synth.init(); // Activate synthesizer on user gesture
+        
         if (!isStepMode) {
             isStepMode = true;
             cancelAnimationFrame(animationFrameId);

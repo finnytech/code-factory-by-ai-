@@ -1,6 +1,6 @@
 /**
  * Quantum Cryptography Engine - BB84, B92, & SARG04 Protocols
- * Implements physical models: attenuation, WCP multi-photon pulses, PNS attack, decoy states.
+ * Implements physical models: attenuation, WCP multi-photon pulses, PNS attack, decoy states, and Weak Measurements.
  */
 
 const BASES = {
@@ -86,7 +86,7 @@ class QKDModule {
         this.keyLength = 100;
         this.noiseLevel = 0.02; // intrinsic alignment error
         this.evePresent = false;
-        this.eveStrategy = 'intercept_resend'; // 'intercept_resend' or 'pns'
+        this.eveStrategy = 'intercept_resend'; // 'intercept_resend', 'pns', or 'weak_measurement'
         
         // Protocol
         this.protocol = PROTOCOLS.BB84;
@@ -178,18 +178,15 @@ class QKDModule {
             
             let photon;
             if (this.protocol === PROTOCOLS.B92) {
-                // B92: Bit 0 is horizontal (rect), Bit 1 is diagonal 45 (diag)
                 basis = (bit === 0) ? BASES.RECTILINEAR : BASES.DIAGONAL;
-                photon = new QuantumPhoton(0, basis); // Alice encodes into H or D (bit 0 inside basis)
+                photon = new QuantumPhoton(0, basis); // encode H or D
             } else {
-                // BB84 / SARG04
                 photon = new QuantumPhoton(bit, basis);
             }
             
             this.aliceBases.push(basis);
             this.alicePhotons.push(photon);
 
-            // SARG04 Announcements: Announce state pairs containing the state
             if (this.protocol === PROTOCOLS.SARG04) {
                 const state = photon.polarization;
                 if (state === POLARIZATIONS.HORIZONTAL) this.sargAnnouncements.push('{H, D}');
@@ -213,7 +210,6 @@ class QKDModule {
         this.bobMeasuredBits = [];
         this.bobClicks = [];
 
-        // Channel Transmissivity T = 10^(-alpha * L / 10)
         const channelT = Math.pow(10, -(this.fiberAttenuation * this.distance) / 10);
         const overallT = channelT * this.detectorEfficiency;
 
@@ -229,25 +225,45 @@ class QKDModule {
             // 1. Eavesdropping simulation
             if (this.evePresent) {
                 if (this.eveStrategy === 'pns' && this.lightSourceMode === 'wcp' && photonCount > 1) {
+                    // PNS Attack
                     eveLearned = 1;
                     eveB = 'Split';
                     eveBit = this.aliceBits[i];
-                    finalPhoton = photon; // Bob gets original state undisturbed
+                    finalPhoton = photon;
+                } else if (this.eveStrategy === 'weak_measurement') {
+                    // NEW: Weak Measurement Eavesdropping Strategy
+                    // Weak coupling: partial information, low disturbance
+                    if (photonCount > 0) {
+                        eveB = Math.random() < 0.5 ? BASES.RECTILINEAR : BASES.DIAGONAL;
+                        
+                        if (eveB === photon.basis) {
+                            // Matching basis: Eve has high chance to read bit, 0 disturbance
+                            eveLearned = Math.random() < 0.7 ? 1 : 0;
+                            finalPhoton = photon;
+                        } else {
+                            // Mismatching basis: Eve gets random guess, couples weakly causing 15% collapse
+                            eveLearned = Math.random() < 0.5 ? 1 : 0;
+                            if (Math.random() < 0.15) {
+                                const measurement = photon.measure(eveB);
+                                finalPhoton = measurement.collapsedPhoton;
+                            } else {
+                                finalPhoton = photon;
+                            }
+                        }
+                        eveBit = eveLearned === 1 ? this.aliceBits[i] : (Math.random() < 0.5 ? 0 : 1);
+                    }
                 } else {
-                    // Intercept-Resend Attack
+                    // Standard Intercept-Resend Attack
                     if (photonCount > 0) {
                         eveB = Math.random() < 0.5 ? BASES.RECTILINEAR : BASES.DIAGONAL;
                         const measurement = photon.measure(eveB);
                         eveBit = measurement.bit;
                         finalPhoton = measurement.collapsedPhoton;
                         
-                        // Check if Eve learns the bit
                         if (this.protocol === PROTOCOLS.B92) {
-                            // In B92, Eve only learns the bit if she gets a click in the opposite basis
                             if (eveB === BASES.RECTILINEAR && eveBit === 1) eveLearned = 1;
                             else if (eveB === BASES.DIAGONAL && eveBit === 1) eveLearned = 1;
                         } else {
-                            // BB84 / SARG04
                             eveLearned = (eveB === photon.basis) ? 1 : 0;
                         }
                     }
@@ -272,7 +288,6 @@ class QKDModule {
                 if (isDarkCount) {
                     this.bobMeasuredBits.push(Math.random() < 0.5 ? 0 : 1);
                 } else {
-                    // Actual photon measurement
                     let measuredPhoton = finalPhoton;
                     if (Math.random() < this.noiseLevel) {
                         measuredPhoton = new QuantumPhoton(finalPhoton.bit === 0 ? 1 : 0, finalPhoton.basis);
@@ -379,8 +394,6 @@ class QKDModule {
 
         let isCompromised = false;
         
-        // Under PNS attack on WCP, if decoy states are OFF, the secure key is fully compromised for BB84/B92.
-        // SARG04 has a slightly higher resistance, but we still consider it compromised without decoys at high distance.
         if (this.evePresent && this.eveStrategy === 'pns' && this.lightSourceMode === 'wcp' && !this.decoyStatesEnabled) {
             isCompromised = true;
             this.log("CRITICAL SECURITY ALERT: PNS attack detected. Without decoy states, the key is fully compromised!");
@@ -430,10 +443,6 @@ class QKDModule {
         const mu = this.meanPhotonNumber;
         const e_det = this.noiseLevel;
 
-        // Protocol multipliers (sifting factor)
-        // BB84 keeps 50% of matching bases.
-        // B92 keeps 25% of click-sift matches.
-        // SARG04 keeps 25% of conclusive pairs.
         let siftFactor = 0.5;
         if (this.protocol === PROTOCOLS.B92 || this.protocol === PROTOCOLS.SARG04) {
             siftFactor = 0.25;
