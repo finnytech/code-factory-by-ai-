@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroForge — Gravity Sandbox</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>AstroForge <span>· procedural gravity sandbox</span></h1>
+    <div class="controls">
+      <label>seed <input id="seed" type="number" value="7" min="0" /></label>
+      <button id="regen">Generate</button>
+      <button id="pause">Pause</button>
+      <label>speed <input id="speed" type="range" min="1" max="8" value="2" /></label>
+    </div>
+  </header>
+  <canvas id="sky"></canvas>
+  <footer>Real N-body gravity · Velocity-Verlet integrator · click the sky to spawn a body</footer>
+
+  <script src="vec2.js"></script>
+  <script src="rng.js"></script>
+  <script src="body.js"></script>
+  <script src="physics.js"></script>
+  <script src="generate.js"></script>
+  <script src="render.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
