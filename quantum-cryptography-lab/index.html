@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Quantum Key Distribution (QKD) Simulator & Visualizer. Explore physical models: attenuation, WCP multi-photon states, PNS attack, decoy states, and live key rate charts.">
-    <title>Quantum Cryptography Lab — BB84, B92 & SARG04 Simulator</title>
+    <title>Quantum Cryptography Lab — BB84, B92, SARG04 & E91 Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,6 +33,7 @@
                         <option value="BB84" selected>BB84 (4-State Protocol)</option>
                         <option value="B92">B92 (2-State Protocol)</option>
                         <option value="SARG04">SARG04 (Attn-Resistant)</option>
+                        <option value="E91">E91 (Entanglement-based)</option>
                     </select>
                 </div>
                 
@@ -62,7 +63,7 @@
                 </div>
 
                 <!-- Light Source Mode -->
-                <div class="control-group">
+                <div class="control-group" id="light-source-container">
                     <label for="source-mode-select">Light Source Mode</label>
                     <select id="source-mode-select" class="form-select">
                         <option value="single_photon">Ideal Single Photon Source</option>
@@ -79,8 +80,8 @@
                     <input type="range" id="mu-slider" min="0.1" max="1.0" step="0.05" value="0.5">
                 </div>
 
-                <!-- NEW: Dark Count Rate Slider (exponents) -->
-                <div class="control-group">
+                <!-- Bob Dark Count Rate Slider -->
+                <div class="control-group" id="dark-count-container">
                     <label for="dark-count-slider">
                         <span>Bob Dark Count Rate</span>
                         <span class="label-val" id="dark-count-val">10^-5</span>
@@ -88,7 +89,7 @@
                     <input type="range" id="dark-count-slider" min="3" max="6" step="1" value="5">
                 </div>
 
-                <!-- NEW: Error Correction Efficiency f(e) -->
+                <!-- Error Correction Efficiency f(e) -->
                 <div class="control-group">
                     <label for="f-efficiency-slider">
                         <span>EC Efficiency f(e)</span>
@@ -109,7 +110,7 @@
                 <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 1rem 0;">
 
                 <!-- Eavesdropping -->
-                <div class="switch-control">
+                <div class="switch-control" id="eve-toggle-container">
                     <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">Active Eavesdropper (Eve)</span>
                     <label class="switch">
                         <input type="checkbox" id="eve-toggle">
@@ -175,8 +176,8 @@
                 <!-- Wizard Steps Indicator -->
                 <div class="wizard-steps">
                     <div class="step active" id="step-0" data-step="0">
-                        <h4>1. Prepare</h4>
-                        <p>Alice Pulses</p>
+                        <h4 id="wizard-title-alice">1. Prepare</h4>
+                        <p id="wizard-desc-alice">Alice Pulses</p>
                     </div>
                     <div class="step" id="step-1" data-step="1">
                         <h4>2. Transmit</h4>
@@ -200,7 +201,7 @@
                 <div class="workspace-panels">
                     <!-- Quantum Channel Visualizer -->
                     <div class="glass-card" style="padding: 1rem;">
-                        <h3 class="card-title" style="font-size: 1.1rem; margin-bottom: 0.75rem; border-bottom: none; padding-bottom: 0;">
+                        <h3 class="card-title" style="font-size: 1.1rem; margin-bottom: 0.75rem; border-bottom: none; padding-bottom: 0;" id="visualizer-header">
                             Quantum Channel Visualizer
                         </h3>
                         <div class="visualizer-container">
@@ -229,7 +230,8 @@
                         <div class="stat-value info" id="stat-yield">-</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">Estimated QBER</div>
+                        <!-- ID added to label for dynamic text switching -->
+                        <div class="stat-label" id="stat-qber-label">Estimated QBER</div>
                         <div class="stat-value" id="stat-qber">-</div>
                     </div>
                     <div class="stat-item">
@@ -252,7 +254,7 @@
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
                     <div>
-                        <div class="stat-label" style="margin-bottom: 0.5rem;">Reconciled Shared Secret Key</div>
+                        <div class="stat-label" style="margin-bottom: 0.5rem;" id="key-label-reconciled">Reconciled Shared Secret Key</div>
                         <div class="key-string-panel" id="secret-key-reconciled">No key generated yet. Run simulation to begin.</div>
                     </div>
                     <div>
@@ -270,12 +272,12 @@
                                 <th>Pulse Type</th>
                                 <th>Photons ($n$)</th>
                                 <th>Alice Bit</th>
-                                <th>Alice Basis</th>
+                                <th id="th-alice-basis">Alice Basis</th>
                                 <th>Polarization</th>
-                                <th>SARG Set / B92 State</th>
+                                <th id="th-announcement">SARG Set / B92 State</th>
                                 <th class="eve-col">Eve Basis</th>
                                 <th class="eve-col">Eve Bit</th>
-                                <th>Bob Basis</th>
+                                <th id="th-bob-basis">Bob Basis</th>
                                 <th>Bob Bit</th>
                                 <th>Bob Click</th>
                                 <th>Sift Match</th>
@@ -302,7 +304,7 @@
                     <div style="width: 42px;"></div>
                 </div>
                 <div class="terminal-body" id="terminal-console">
-                    <div class="log-line"><span>[13:00:00]</span> Physical Quantum Cryptography Lab active. Poisson coherent laser sources calibrated.</div>
+                    <div class="log-line"><span>[13:17:00]</span> Physical Quantum Cryptography Lab active. Poisson coherent laser sources calibrated.</div>
                 </div>
             </div>
 

@@ -1,6 +1,7 @@
 /**
  * Quantum Cryptography Lab - Application Logic & Visualization
- * Binds QKD physical models, Cascade reconciliation, and Web Audio SFX to the GUI.
+ * Binds QKD physical models, Cascade reconciliation, E91 CHSH Bell parameters,
+ * and Web Audio SFX to the GUI.
  */
 
 // Procedural Web Audio Synth Class
@@ -178,17 +179,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const sourceModeSelect = document.getElementById('source-mode-select');
     const muSlider = document.getElementById('mu-slider');
     const muVal = document.getElementById('mu-val');
+    
+    // Containers to toggle on protocol change
+    const lightSourceContainer = document.getElementById('light-source-container');
     const muContainer = document.getElementById('mu-container');
-    const decoyToggle = document.getElementById('decoy-toggle');
     const decoyContainer = document.getElementById('decoy-container');
-    const eveStrategySelect = document.getElementById('eve-strategy-select');
+    const darkCountContainer = document.getElementById('dark-count-container');
+    const eveToggleContainer = document.getElementById('eve-toggle-container');
     const eveStrategyContainer = document.getElementById('eve-strategy-container');
     
-    // NEW: Bob Dark Count & EC Efficiency Sliders
+    // Bob Dark Count & EC Efficiency Sliders
     const darkCountSlider = document.getElementById('dark-count-slider');
     const darkCountVal = document.getElementById('dark-count-val');
     const fEfficiencySlider = document.getElementById('f-efficiency-slider');
     const fEfficiencyVal = document.getElementById('f-efficiency-val');
+    const decoyToggle = document.getElementById('decoy-toggle');
+    const eveStrategySelect = document.getElementById('eve-strategy-select');
     
     // DOM Elements - Challenges
     const btnActivateC1 = document.getElementById('btn-activate-c1');
@@ -203,11 +209,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const badgeC2 = document.getElementById('badge-c2');
     const badgeC3 = document.getElementById('badge-c3');
     
-    // DOM Elements - Wizard
+    // DOM Elements - Wizard & Labels
     const steps = document.querySelectorAll('.step');
+    const wizardTitleAlice = document.getElementById('wizard-title-alice');
+    const wizardDescAlice = document.getElementById('wizard-desc-alice');
+    const visualizerHeader = document.getElementById('visualizer-header');
+    const aliceTag = document.getElementById('alice-tag');
+    const keyLabelReconciled = document.getElementById('key-label-reconciled');
+    
+    // Table Headers
+    const thAliceBasis = document.getElementById('th-alice-basis');
+    const thBobBasis = document.getElementById('th-bob-basis');
+    const thAnnouncement = document.getElementById('th-announcement');
     
     // DOM Elements - Stats
     const statYield = document.getElementById('stat-yield');
+    const statQberLabel = document.getElementById('stat-qber-label');
     const statQber = document.getElementById('stat-qber');
     const statStatus = document.getElementById('stat-status');
     const statKeyLen = document.getElementById('stat-key-len');
@@ -233,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let animationFrameId = null;
     let photons = [];
     let particles = [];
-    let transmitterX, receiverX, middleY;
+    let transmitterX, receiverX, middleY, midX;
     let simulationResults = null;
     
     // Challenge State
@@ -255,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         transmitterX = 60;
         receiverX = rect.width - 60;
         middleY = rect.height / 2;
+        midX = rect.width / 2;
         
         drawChart();
     }
@@ -270,8 +288,63 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     protocolSelect.addEventListener('change', (e) => {
-        qkd.protocol = e.target.value;
-        logConsole(`Protocol switched to ${qkd.protocol}.`);
+        const proto = e.target.value;
+        qkd.protocol = proto;
+        logConsole(`Protocol switched to ${proto}.`);
+        
+        // Dynamic elements configuration based on protocol selection
+        if (proto === 'E91') {
+            // E91 Entanglement Specifics: hide prepare-and-measure parameters
+            lightSourceContainer.style.display = 'none';
+            muContainer.style.display = 'none';
+            decoyContainer.style.display = 'none';
+            
+            // Adjust label texts
+            wizardTitleAlice.textContent = '1. EPR Source';
+            wizardDescAlice.textContent = 'Singlet Pairs';
+            visualizerHeader.textContent = 'Quantum Channel Visualizer (E91 Entangled Singlet Source)';
+            aliceTag.textContent = 'Alice Detectors';
+            keyLabelReconciled = 'Reconciled Shared Key (Bob inverted)';
+            
+            thAliceBasis.textContent = 'Alice Basis (1/2/3)';
+            thBobBasis.textContent = 'Bob Basis (1/2/3)';
+            thAnnouncement.textContent = 'Correlation State Pair';
+            statQberLabel.textContent = 'Bell S / QBER';
+            
+            // Remove PNS (only works on coherent pulses)
+            for (let i = 0; i < eveStrategySelect.options.length; i++) {
+                if (eveStrategySelect.options[i].value === 'pns') {
+                    eveStrategySelect.options[i].disabled = true;
+                }
+            }
+            if (eveStrategySelect.value === 'pns') eveStrategySelect.value = 'intercept_resend';
+        } else {
+            // Restore layouts
+            lightSourceContainer.style.display = 'block';
+            if (sourceModeSelect.value === 'wcp') {
+                muContainer.style.display = 'block';
+                decoyContainer.style.display = 'flex';
+            }
+            
+            wizardTitleAlice.textContent = '1. Prepare';
+            wizardDescAlice.textContent = 'Alice Pulses';
+            visualizerHeader.textContent = 'Quantum Channel Visualizer';
+            aliceTag.textContent = 'Alice Laser';
+            keyLabelReconciled = 'Reconciled Shared Secret Key';
+            
+            thAliceBasis.textContent = 'Alice Basis';
+            thBobBasis.textContent = 'Bob Basis';
+            thAnnouncement.textContent = 'SARG Set / B92 State';
+            statQberLabel.textContent = 'Estimated QBER';
+            
+            // Re-enable PNS
+            for (let i = 0; i < eveStrategySelect.options.length; i++) {
+                if (eveStrategySelect.options[i].value === 'pns') {
+                    eveStrategySelect.options[i].disabled = false;
+                }
+            }
+        }
+        
         drawChart();
     });
     
@@ -295,7 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
         drawChart();
     });
     
-    // Bind Bob Dark Count Exponent Slider
     darkCountSlider.addEventListener('input', (e) => {
         const exp = e.target.value;
         darkCountVal.textContent = `10^-${exp}`;
@@ -303,7 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
         drawChart();
     });
     
-    // Bind EC Efficiency f(e) Slider
     fEfficiencySlider.addEventListener('input', (e) => {
         const f = e.target.value;
         fEfficiencyVal.textContent = f;
@@ -584,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.font = '9px Outfit';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('ALICE', transmitterX, middleY);
+        ctx.fillText(qkd.protocol === 'E91' ? 'ALICE' : 'ALICE', transmitterX, middleY);
         ctx.restore();
         
         // 3. Bob
@@ -605,15 +676,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillText('BOB', receiverX, middleY);
         ctx.restore();
         
-        // 4. Eve
-        const midX = (transmitterX + receiverX) / 2;
-        if (qkd.evePresent) {
+        // 4. Central EPR Source (E91 Specific)
+        if (qkd.protocol === 'E91') {
             ctx.save();
-            ctx.fillStyle = 'rgba(16, 20, 38, 0.85)';
-            ctx.strokeStyle = 'var(--neon-orange)';
+            ctx.fillStyle = 'rgba(16, 20, 38, 0.9)';
+            ctx.strokeStyle = 'var(--neon-cyan)';
             ctx.lineWidth = 2;
             ctx.shadowBlur = 8;
-            ctx.shadowColor = 'var(--neon-orange)';
+            ctx.shadowColor = 'var(--neon-cyan)';
             ctx.beginPath();
             ctx.arc(midX, middleY, 16, 0, Math.PI * 2);
             ctx.fill();
@@ -622,11 +692,33 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.font = '9px Outfit';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('EVE', midX, middleY);
+            ctx.fillText('EPR', midX, middleY);
             ctx.restore();
         }
         
-        // 5. Photons
+        // 5. Eve
+        // For E91, Eve intercepts between EPR source and Bob
+        const eveX = qkd.protocol === 'E91' ? (midX + receiverX) / 2 : (transmitterX + receiverX) / 2;
+        if (qkd.evePresent) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(16, 20, 38, 0.85)';
+            ctx.strokeStyle = 'var(--neon-orange)';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = 'var(--neon-orange)';
+            ctx.beginPath();
+            ctx.arc(eveX, middleY, 16, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = '9px Outfit';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('EVE', eveX, middleY);
+            ctx.restore();
+        }
+        
+        // 6. Photons
         let activePhotons = [];
         for (let i = 0; i < photons.length; i++) {
             let photon = photons[i];
@@ -634,7 +726,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!photon.absorbed) {
                 photon.x += photon.speed;
                 const distanceFactor = qkd.distance / 120;
-                if (photon.x > transmitterX + 50 && photon.x < receiverX - 50) {
+                
+                // Attenuation loss test
+                if (Math.abs(photon.x - midX) > 40 && Math.abs(photon.x - midX) < (receiverX - midX - 20)) {
                     if (Math.random() < 0.0012 * distanceFactor) {
                         photon.absorbed = true;
                         createExplosion(photon.x, photon.y, 'rgba(255, 255, 255, 0.2)', 4);
@@ -648,43 +742,55 @@ document.addEventListener('DOMContentLoaded', () => {
             if (photon.alpha <= 0) continue;
             
             // Eve Intercept
-            if (qkd.evePresent && !photon.intercepted && photon.x >= midX && !photon.absorbed) {
-                photon.intercepted = true;
+            if (qkd.evePresent && !photon.intercepted && !photon.absorbed) {
+                // Determine collision bounds
+                const reachedEve = (photon.speed > 0) ? (photon.x >= eveX) : (photon.x <= eveX);
                 
-                if (qkd.eveStrategy === 'pns' && photon.photonCount > 1) {
-                    createExplosion(midX, middleY, 'var(--neon-orange)', 8);
-                    logConsole(`Pulse #${photon.index + 1} ($n=${photon.photonCount}$): Eve split off 1 photon to memory.`, 'warning');
-                    photon.color = 'var(--neon-purple)';
-                } else {
+                // In E91, Eve intercepts the photon travelling to Bob (positive speed)
+                if (reachedEve && ((qkd.protocol === 'E91' && photon.speed > 0) || qkd.protocol !== 'E91')) {
+                    photon.intercepted = true;
                     photon.color = 'var(--neon-orange)';
-                    createExplosion(midX, middleY, 'var(--neon-orange)', 12);
+                    createExplosion(eveX, middleY, 'var(--neon-orange)', 12);
                     synth.playAlarm();
                     logConsole(`Pulse #${photon.index + 1}: Intercepted and measured by Eve in basis ${simulationResults.eveBases[photon.index]}`, 'warning');
                 }
             }
             
-            // Bob Receive
-            if (photon.x >= receiverX && !photon.absorbed) {
-                const clicked = simulationResults.bobClicks[photon.index];
-                if (clicked) {
-                    createExplosion(receiverX, middleY, photon.color, 12);
-                    const bitVal = simulationResults.bobBits[photon.index];
-                    const basisVal = simulationResults.bobBases[photon.index];
-                    
-                    let matchText = '';
-                    if (qkd.protocol === 'B92') {
-                        matchText = (basisVal === BASES.RECTILINEAR && bitVal === 1) || (basisVal === BASES.DIAGONAL && bitVal === 1) ? 'sifted conclusive click' : 'inconclusive click';
+            // Receive bounds check (Left bounds for Alice in E91, Right bounds for Bob)
+            const reachedBob = (photon.speed > 0 && photon.x >= receiverX);
+            const reachedAliceE91 = (qkd.protocol === 'E91' && photon.speed < 0 && photon.x <= transmitterX);
+            
+            if ((reachedBob || reachedAliceE91) && !photon.absorbed) {
+                if (reachedBob) {
+                    const clicked = simulationResults.bobClicks[photon.index];
+                    if (clicked) {
+                        createExplosion(receiverX, middleY, photon.color, 12);
+                        const bitVal = simulationResults.bobBits[photon.index];
+                        const basisVal = simulationResults.bobBases[photon.index];
+                        
+                        let matchText = '';
+                        if (qkd.protocol === 'B92') {
+                            matchText = (basisVal === BASES.RECTILINEAR && bitVal === 1) || (basisVal === BASES.DIAGONAL && bitVal === 1) ? 'sifted conclusive click' : 'inconclusive click';
+                        } else if (qkd.protocol === 'E91') {
+                            matchText = (simulationResults.aliceBases[photon.index] === basisVal) ? 'sifted match (Bob inverted)' : 'basis mismatch (Bell test)';
+                        } else {
+                            matchText = (simulationResults.aliceBases[photon.index] === basisVal) ? 'sifted match' : 'basis mismatch';
+                        }
+                        
+                        const clickFreq = (basisVal === BASES.RECTILINEAR || basisVal === '1') ? 1150 : 1350;
+                        synth.playClick(clickFreq);
+                        logConsole(`Bob detected click for Pair #${photon.index + 1} (${basisVal}) -> Bit ${bitVal} (${matchText})`);
                     } else {
-                        matchText = (simulationResults.aliceBases[photon.index] === basisVal) ? 'sifted match' : 'basis mismatch';
+                        createExplosion(receiverX, middleY, 'rgba(255,255,255,0.05)', 3);
+                        logConsole(`Bob: No click registered for Pair #${photon.index + 1}`);
                     }
-                    
-                    const clickFreq = (basisVal === BASES.RECTILINEAR) ? 1150 : 1350;
-                    synth.playClick(clickFreq);
-                    
-                    logConsole(`Bob detected click for Pulse #${photon.index + 1} (${basisVal}) -> Bit ${bitVal} (${matchText})`);
-                } else {
-                    createExplosion(receiverX, middleY, 'rgba(255,255,255,0.05)', 3);
-                    logConsole(`Bob: No click registered for Pulse #${photon.index + 1}`);
+                } else if (reachedAliceE91) {
+                    // Alice receives her entangled photon
+                    createExplosion(transmitterX, middleY, photon.color, 6);
+                    const basisVal = simulationResults.aliceBases[photon.index];
+                    const bitVal = simulationResults.aliceBits[photon.index];
+                    synth.playClick(950);
+                    logConsole(`Alice detected click for Pair #${photon.index + 1} (${basisVal}) -> Bit ${bitVal}`);
                 }
                 continue;
             }
@@ -697,35 +803,20 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.shadowBlur = 10;
             ctx.shadowColor = photon.color;
             
-            if (photon.photonCount > 1 && !photon.intercepted) {
-                const offsets = [[-4, -3], [4, -3], [0, 4]];
-                offsets.forEach(off => {
-                    ctx.beginPath();
-                    ctx.arc(photon.x + off[0], photon.y + off[1], photon.size - 3, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-            } else if (photon.photonCount === 0) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(photon.x, photon.y, photon.size - 2, 0, Math.PI * 2);
-                ctx.stroke();
-            } else {
-                ctx.beginPath();
-                ctx.arc(photon.x, photon.y, photon.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            ctx.beginPath();
+            ctx.arc(photon.x, photon.y, photon.size, 0, Math.PI * 2);
+            ctx.fill();
             
-            if (photon.photonCount === 1) {
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                const angle = photon.angle;
-                const r = photon.size + 1;
-                ctx.moveTo(photon.x - Math.cos(angle) * r, photon.y - Math.sin(angle) * r);
-                ctx.lineTo(photon.x + Math.cos(angle) * r, photon.y + Math.sin(angle) * r);
-                ctx.stroke();
-            }
+            // Draw polarization vector line
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const angle = photon.angle;
+            const r = photon.size + 1;
+            ctx.moveTo(photon.x - Math.cos(angle) * r, photon.y - Math.sin(angle) * r);
+            ctx.lineTo(photon.x + Math.cos(angle) * r, photon.y + Math.sin(angle) * r);
+            ctx.stroke();
+            
             ctx.restore();
         }
         
@@ -756,11 +847,14 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < count; i++) {
             const bit = simulationResults.aliceBits[i];
             const basis = simulationResults.aliceBases[i];
-            const photonCount = simulationResults.photonCounts[i];
             
             let angle = 0;
             if (qkd.protocol === 'B92') {
                 angle = (bit === 0) ? 0 : Math.PI / 4;
+            } else if (qkd.protocol === 'E91') {
+                // Map bases indices 1,2,3 to visual angle representations
+                const bNum = parseInt(basis);
+                angle = (bNum - 1) * Math.PI / 4;
             } else {
                 if (basis === BASES.RECTILINEAR) {
                     angle = (bit === 0) ? 0 : Math.PI / 2;
@@ -769,26 +863,67 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            const color = (basis === BASES.RECTILINEAR) ? 'var(--neon-cyan)' : 'var(--neon-purple)';
+            const color = (basis === BASES.RECTILINEAR || basis === '1' || basis === '3') ? 'var(--neon-cyan)' : 'var(--neon-purple)';
             
-            photons.push({
-                index: i,
-                x: transmitterX - (i * spacing),
-                y: middleY,
-                size: 8,
-                speed: 3.5,
-                angle: angle,
-                color: color,
-                basis: basis,
-                bit: bit,
-                photonCount: photonCount,
-                intercepted: false,
-                absorbed: false,
-                alpha: 1.0
-            });
+            if (qkd.protocol === 'E91') {
+                // Entangled photons travel outwards from the center source (midX)
+                // Left-moving photon to Alice
+                photons.push({
+                    index: i,
+                    x: midX + (i * spacing),
+                    y: middleY,
+                    size: 7,
+                    speed: -3.5, // negative speed
+                    angle: angle,
+                    color: color,
+                    basis: basis,
+                    bit: bit,
+                    photonCount: 1,
+                    intercepted: false,
+                    absorbed: false,
+                    alpha: 1.0
+                });
+                // Right-moving photon to Bob
+                photons.push({
+                    index: i,
+                    x: midX - (i * spacing),
+                    y: middleY,
+                    size: 7,
+                    speed: 3.5, // positive speed
+                    angle: angle,
+                    color: color,
+                    basis: basis,
+                    bit: bit,
+                    photonCount: 1,
+                    intercepted: false,
+                    absorbed: false,
+                    alpha: 1.0
+                });
+            } else {
+                // Prepare-and-measure standard flow (Alice to Bob)
+                photons.push({
+                    index: i,
+                    x: transmitterX - (i * spacing),
+                    y: middleY,
+                    size: 8,
+                    speed: 3.5,
+                    angle: angle,
+                    color: color,
+                    basis: basis,
+                    bit: bit,
+                    photonCount: simulationResults.photonCounts[i],
+                    intercepted: false,
+                    absorbed: false,
+                    alpha: 1.0
+                });
+            }
         }
         
-        logConsole(`Alice fires ${count} coherent optical pulses down the fiber...`);
+        if (qkd.protocol === 'E91') {
+            logConsole(`EPR Source emitted ${count} entangled singlet state pairs...`);
+        } else {
+            logConsole(`Alice fires ${count} coherent optical pulses down the fiber...`);
+        }
     }
     
     // Chart rendering
@@ -877,14 +1012,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         drawCurve(data.ideal, 'var(--neon-cyan)');
-        drawCurve(data.wcpDecoy, 'var(--neon-purple)');
-        drawCurve(data.wcpNoDecoy, 'var(--neon-orange)');
+        
+        // Hide WCP decoy curves under E91 as it relies strictly on single-photon EPR pairs
+        if (qkd.protocol !== 'E91') {
+            drawCurve(data.wcpDecoy, 'var(--neon-purple)');
+            drawCurve(data.wcpNoDecoy, 'var(--neon-orange)');
+        }
         
         const currD = qkd.distance;
         const tempModule = new QKDModule();
         tempModule.detectorEfficiency = qkd.detectorEfficiency;
         tempModule.darkCountRate = qkd.darkCountRate;
-        tempModule.errorCorrectionEfficiency = qkd.errorCorrectionEfficiency; // Custom EC efficiency f(e)!
+        tempModule.errorCorrectionEfficiency = qkd.errorCorrectionEfficiency;
         tempModule.fiberAttenuation = qkd.fiberAttenuation;
         tempModule.meanPhotonNumber = qkd.meanPhotonNumber;
         tempModule.noiseLevel = qkd.noiseLevel;
@@ -892,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const currRates = tempModule.calculateTheoreticalKeyRates([currD]);
         let currR = 0;
-        if (qkd.lightSourceMode === 'single_photon') currR = currRates.ideal[0];
+        if (qkd.protocol === 'E91' || qkd.lightSourceMode === 'single_photon') currR = currRates.ideal[0];
         else if (qkd.decoyStatesEnabled) currR = currRates.wcpDecoy[0];
         else currR = currRates.wcpNoDecoy[0];
         
@@ -930,11 +1069,18 @@ document.addEventListener('DOMContentLoaded', () => {
         chartCtx.fillStyle = 'var(--text-secondary)';
         chartCtx.textAlign = 'left';
         
-        const legendItems = [
-            { text: 'Single Photon', color: 'var(--neon-cyan)' },
-            { text: 'WCP (Decoy)', color: 'var(--neon-purple)' },
-            { text: 'WCP (No Decoy)', color: 'var(--neon-orange)' }
-        ];
+        let legendItems = [];
+        if (qkd.protocol === 'E91') {
+            legendItems = [
+                { text: 'Entangled EPR Pair', color: 'var(--neon-cyan)' }
+            ];
+        } else {
+            legendItems = [
+                { text: 'Single Photon', color: 'var(--neon-cyan)' },
+                { text: 'WCP (Decoy)', color: 'var(--neon-purple)' },
+                { text: 'WCP (No Decoy)', color: 'var(--neon-orange)' }
+            ];
+        }
         
         legendItems.forEach((item, idx) => {
             const itemY = legY + 8 + idx * 14;
@@ -959,7 +1105,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (currentStep === 0) {
             btnStep.textContent = "Start Transmission";
-            logConsole(`Phase 1: Alice prepared ${qkd.protocol} state streams.`);
+            if (qkd.protocol === 'E91') {
+                logConsole("Phase 1: EPR source aligned and loaded with singlet polarization pairs.");
+            } else {
+                logConsole(`Phase 1: Alice prepared ${qkd.protocol} state streams.`);
+            }
         } else if (currentStep === 1) {
             btnStep.textContent = "Bob Detects Pulses";
             synth.init();
@@ -978,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnStep.textContent = "Simulation Reset";
             qkd.estimateErrorAndCorrect();
             
-            // Print Cascade interactive error correction logs to the debug console
+            // Print Cascade interactive error correction logs
             if (simulationResults && simulationResults.cascadeLogs) {
                 simulationResults.cascadeLogs.forEach(line => {
                     logConsole(`[Cascade EC] ${line}`);
@@ -1012,17 +1162,35 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (currentStep >= 4) {
             const qberVal = qkd.qber * 100;
-            statQber.textContent = `${qberVal.toFixed(1)}%`;
-            const isCompromised = (qkd.secureKey.length === 0);
             
-            if (isCompromised) {
-                statStatus.textContent = "COMPROMISED";
-                statStatus.className = "stat-value warning";
-                statQber.className = "stat-value warning";
+            if (qkd.protocol === 'E91') {
+                // Render Bell S next to QBER
+                statQber.textContent = `S: ${qkd.e91BellS.toFixed(2)} | QBER: ${qberVal.toFixed(0)}%`;
+                
+                // Bell inequality holds if S > 2.0. If S <= 2.1 under Eve presence, it is compromised.
+                const isCompromised = (qkd.secureKey.length === 0);
+                if (isCompromised) {
+                    statStatus.textContent = "COLLAPSED (S <= 2)";
+                    statStatus.className = "stat-value warning";
+                    statQber.className = "stat-value warning";
+                } else {
+                    statStatus.textContent = "SECURE (S > 2)";
+                    statStatus.className = "stat-value safe";
+                    statQber.className = "stat-value safe";
+                }
             } else {
-                statStatus.textContent = "SECURE";
-                statStatus.className = "stat-value safe";
-                statQber.className = "stat-value safe";
+                statQber.textContent = `${qberVal.toFixed(1)}%`;
+                const isCompromised = (qkd.secureKey.length === 0);
+                
+                if (isCompromised) {
+                    statStatus.textContent = "COMPROMISED";
+                    statStatus.className = "stat-value warning";
+                    statQber.className = "stat-value warning";
+                } else {
+                    statStatus.textContent = "SECURE";
+                    statStatus.className = "stat-value safe";
+                    statQber.className = "stat-value safe";
+                }
             }
             statKeyLen.textContent = `${qkd.secureKey.length} bits`;
         } else {
@@ -1063,16 +1231,21 @@ document.addEventListener('DOMContentLoaded', () => {
             tdIndex.textContent = i + 1;
             tr.appendChild(tdIndex);
             
-            // Pulse Type
+            // Pulse Type / EPR state
             const tdPulse = document.createElement('td');
-            tdPulse.textContent = qkd.pulseStates[i];
-            if (qkd.pulseStates[i] === 'DECOY') tdPulse.style.color = 'var(--neon-purple)';
-            if (qkd.pulseStates[i] === 'VACUUM') tdPulse.style.color = 'var(--text-muted)';
+            if (qkd.protocol === 'E91') {
+                tdPulse.textContent = 'EPR Pair';
+                tdPulse.style.color = 'var(--neon-cyan)';
+            } else {
+                tdPulse.textContent = qkd.pulseStates[i];
+                if (qkd.pulseStates[i] === 'DECOY') tdPulse.style.color = 'var(--neon-purple)';
+                if (qkd.pulseStates[i] === 'VACUUM') tdPulse.style.color = 'var(--text-muted)';
+            }
             tr.appendChild(tdPulse);
             
             // Photon Count
             const tdPhotonCount = document.createElement('td');
-            tdPhotonCount.textContent = qkd.photonCounts[i];
+            tdPhotonCount.textContent = qkd.protocol === 'E91' ? 'Singlet' : qkd.photonCounts[i];
             tdPhotonCount.style.fontFamily = 'var(--font-mono)';
             tr.appendChild(tdPhotonCount);
             
@@ -1083,29 +1256,41 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Alice Basis
             const tdAliceBasis = document.createElement('td');
-            const abClass = qkd.aliceBases[i] === BASES.RECTILINEAR ? 'basis-rect' : 'basis-diag';
-            tdAliceBasis.innerHTML = `<span class="${abClass}">${qkd.aliceBases[i]}</span>`;
+            const aBasis = qkd.aliceBases[i];
+            if (qkd.protocol === 'E91') {
+                tdAliceBasis.innerHTML = `<span class="basis-rect" style="border-radius: 4px; padding: 1px 6px;">Basis ${aBasis}</span>`;
+            } else {
+                const abClass = aBasis === BASES.RECTILINEAR ? 'basis-rect' : 'basis-diag';
+                tdAliceBasis.innerHTML = `<span class="${abClass}">${aBasis}</span>`;
+            }
             tr.appendChild(tdAliceBasis);
             
             // Polarization
             const tdPolarization = document.createElement('td');
-            let symbolClass = qkd.aliceBases[i] === BASES.RECTILINEAR ? 'symbol-rect' : 'symbol-diag';
+            let symbolClass = 'symbol-rect';
             let symbolChar = '';
             
             if (qkd.protocol === 'B92') {
                 symbolChar = qkd.aliceBits[i] === 0 ? '→' : '↗';
                 symbolClass = qkd.aliceBits[i] === 0 ? 'symbol-rect' : 'symbol-diag';
+            } else if (qkd.protocol === 'E91') {
+                // Display the theoretical angle degrees
+                const bNum = parseInt(aBasis);
+                const angleDeg = (bNum - 1) * 45;
+                symbolChar = `${angleDeg}°`;
+                symbolClass = bNum === 2 ? 'symbol-diag' : 'symbol-rect';
             } else {
                 if (qkd.aliceBases[i] === BASES.RECTILINEAR) {
                     symbolChar = qkd.aliceBits[i] === 0 ? '→' : '↑';
                 } else {
                     symbolChar = qkd.aliceBits[i] === 0 ? '↗' : '↖';
                 }
+                symbolClass = qkd.aliceBases[i] === BASES.RECTILINEAR ? 'symbol-rect' : 'symbol-diag';
             }
             tdPolarization.innerHTML = `<span class="basis-symbol ${symbolClass}">${symbolChar}</span>`;
             tr.appendChild(tdPolarization);
             
-            // SARG Set announcement / B92 state name
+            // Set / State column
             const tdAnnouncement = document.createElement('td');
             if (qkd.protocol === 'SARG04') {
                 tdAnnouncement.textContent = qkd.sargAnnouncements[i];
@@ -1113,6 +1298,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (qkd.protocol === 'B92') {
                 tdAnnouncement.textContent = qkd.aliceBits[i] === 0 ? 'H (Rect 0)' : 'D (Diag 1)';
                 tdAnnouncement.style.color = 'var(--text-secondary)';
+            } else if (qkd.protocol === 'E91') {
+                // Bell pair singlet representation
+                tdAnnouncement.textContent = '|Ψ⁻⟩ Singlet';
+                tdAnnouncement.style.color = 'var(--neon-cyan)';
             } else {
                 tdAnnouncement.textContent = '-';
                 tdAnnouncement.style.color = 'var(--text-muted)';
@@ -1141,8 +1330,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Bob Basis
             const tdBobBasis = document.createElement('td');
-            const bbClass = qkd.bobBases[i] === BASES.RECTILINEAR ? 'basis-rect' : 'basis-diag';
-            tdBobBasis.innerHTML = `<span class="${bbClass}">${qkd.bobBases[i]}</span>`;
+            const bBasis = qkd.bobBases[i];
+            if (qkd.protocol === 'E91') {
+                tdBobBasis.innerHTML = `<span class="basis-diag" style="border-radius: 4px; padding: 1px 6px;">Basis ${bBasis}</span>`;
+            } else {
+                const bbClass = bBasis === BASES.RECTILINEAR ? 'basis-rect' : 'basis-diag';
+                tdBobBasis.innerHTML = `<span class="${bbClass}">${bBasis}</span>`;
+            }
             tr.appendChild(tdBobBasis);
             
             // Bob Bit
@@ -1163,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let isSiftMatch = false;
             if (qkd.bobClicks[i]) {
-                if (qkd.protocol === 'BB84') {
+                if (qkd.protocol === 'BB84' || qkd.protocol === 'E91') {
                     isSiftMatch = (qkd.aliceBases[i] === qkd.bobBases[i]);
                 } else if (qkd.protocol === 'B92') {
                     isSiftMatch = (qkd.bobBases[i] === BASES.RECTILINEAR && qkd.bobMeasuredBits[i] === 1) || (qkd.bobBases[i] === BASES.DIAGONAL && qkd.bobMeasuredBits[i] === 1);
@@ -1256,7 +1450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             qkd.eveStrategy = eveStrategySelect.value;
             qkd.protocol = protocolSelect.value;
             
-            // Sync new sliders
+            // Sync sliders
             const dcExp = darkCountSlider.value;
             qkd.darkCountRate = Math.pow(10, -parseInt(dcExp));
             qkd.errorCorrectionEfficiency = parseFloat(fEfficiencySlider.value);
@@ -1273,7 +1467,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 photonCounts: qkd.photonCounts,
                 pulseStates: qkd.pulseStates,
                 sargAnnouncements: qkd.sargAnnouncements,
-                cascadeLogs: qkd.cascadeLogs
+                cascadeLogs: qkd.cascadeLogs,
+                e91BellS: qkd.e91BellS
             };
             
             qkd.bobBases = Array(size).fill('-');
@@ -1290,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 simulationResults.bobClicks = qkd.bobClicks;
                 simulationResults.eveBases = qkd.eveBases;
                 simulationResults.eveMeasuredBits = qkd.eveMeasuredBits;
+                simulationResults.e91BellS = qkd.e91BellS;
                 
                 goToStep(1);
             } else if (currentStep === 1) {
