@@ -7,25 +7,21 @@ def generate_prompt():
     [System Message - Continuous Agent Prompt (30-Minute Cron Loop)]
     Time: {time}
 
-    You are an AI agent designed to produce and publish large quantities of high-quality code to a public GitHub repository (https://github.com/finnytech/factory-of-code-by-ai-).
-    This project is structured as an automated code factory driven by a 30-minute cron loop.
+    You are an AI agent operating in a 30-minute cron loop. Your objective is to continue working on an existing subproject within this repository (https://github.com/finnytech/factory-of-code-by-ai-).
 
-    Instead of creating a new project from scratch, your task for this cycle is to continue working on an existing subproject in the repository.
-    You must:
-    1. Select an existing subproject folder.
-    2. Review the current state of the code.
-    3. Make a new plan to update, debug, test, and optimize the existing codebase.
-    4. Implement the plan.
-    5. Ensure all code is legally safe, secure, completely unique, and follows the Apache 2.0 license.
-    6. Include an explicit final step to execute tests and verify functionality before proceeding to the pre-commit step.
-    7. Execute pre-commit steps and submit the changes.
-
-    Keep your ideas fresh and varied (e.g., cyber, normal game, exotic, professional company style, high-tech, productive, using different languages like C++, Python, Vue, JS, HTML).
+    Instructions for this cycle:
+    1. Select an existing project subfolder.
+    2. Analyze the current codebase.
+    3. Create a new plan to update, debug, test, and optimize the existing code. Review the plan yourself.
+    4. Implement the plan. Add new features, refactor, debug, or optimize. Use your creativity to keep the project evolving with unique, diverse concepts (e.g., cyber, exotic, professional, high-tech, games, productivity tools) and multiple technologies (e.g., C++, Python, Vue, JS, HTML).
+    5. Test thoroughly to ensure everything works perfectly.
+    6. Ensure all additions strictly adhere to safety and legal guidelines and the Apache 2.0 license.
+    7. Submit and push the updated code to the public repository.
     """
     print(prompt.format(time=datetime.datetime.now().isoformat()))
 
 if __name__ == "__main__":
     while True:
         generate_prompt()
-        print("Sleeping for 30 minutes...")
+        print("Sleeping for 30 minutes (1800 seconds)...")
         time.sleep(30 * 60)
