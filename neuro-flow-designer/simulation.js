@@ -6,6 +6,9 @@ window.NeuroSimulation = {
     timerId: null,
     queue: [],
     visitedNodes: new Set(),
+    queuedNodes: new Set(),
+    activeNodes: new Set(),
+    completedNodes: new Set(),
     activeTimeouts: [],
 
     init() {
@@ -16,6 +19,9 @@ window.NeuroSimulation = {
         this.stopAllTimeouts();
         this.queue = [];
         this.visitedNodes.clear();
+        this.queuedNodes.clear();
+        this.activeNodes.clear();
+        this.completedNodes.clear();
         
         // Reset node visual status
         window.App.nodes.forEach(node => {
@@ -61,9 +67,7 @@ window.NeuroSimulation = {
             entryNodes = [window.App.nodes[0]];
         }
 
-        entryNodes.forEach(node => {
-            this.queue.push(node.id);
-        });
+        entryNodes.forEach(node => this.enqueue(node.id));
 
         window.App.updateMetrics({ queue: this.queue.length });
         
@@ -73,6 +77,15 @@ window.NeuroSimulation = {
 
     pause() {
         this.stopAllTimeouts();
+    },
+
+    enqueue(nodeId) {
+        if (this.completedNodes.has(nodeId) || this.queuedNodes.has(nodeId) || this.activeNodes.has(nodeId)) {
+            return false;
+        }
+        this.queue.push(nodeId);
+        this.queuedNodes.add(nodeId);
+        return true;
     },
 
     processNextInQueue() {
@@ -89,6 +102,7 @@ window.NeuroSimulation = {
         }
 
         const nodeId = this.queue.shift();
+        this.queuedNodes.delete(nodeId);
         window.App.updateMetrics({ queue: this.queue.length });
 
         this.executeNode(nodeId);
@@ -97,6 +111,10 @@ window.NeuroSimulation = {
     executeNode(nodeId) {
         const node = window.App.nodes.find(n => n.id === nodeId);
         if (!node) return;
+
+        if (this.completedNodes.has(nodeId) || this.activeNodes.has(nodeId)) return;
+
+        this.activeNodes.add(nodeId);
 
         // Visual update
         window.NeuroEditor.setNodeStatus(nodeId, "active");
@@ -135,6 +153,8 @@ window.NeuroSimulation = {
 
         const timeoutId = setTimeout(() => {
             // Complete current node
+            this.activeNodes.delete(nodeId);
+            this.completedNodes.add(nodeId);
             window.NeuroEditor.setNodeStatus(nodeId, "success");
             
             // Calculate mock API metrics
@@ -152,12 +172,7 @@ window.NeuroSimulation = {
                 .filter(c => c.source === nodeId)
                 .map(c => c.target);
 
-            downstream.forEach(targetId => {
-                // Prevent duplicate queue processing of active nodes
-                if (!this.queue.includes(targetId)) {
-                    this.queue.push(targetId);
-                }
-            });
+            downstream.forEach(targetId => this.enqueue(targetId));
 
             window.App.updateMetrics({ queue: this.queue.length });
 
