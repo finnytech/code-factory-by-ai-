@@ -1,1 +1,15 @@
-const c=require('./core.js');const a=require('assert');a.equal(c.compare([1,0,0],[1,1,0]),'before');a.equal(c.compare([1,0,1],[0,1,1]),'concurrent');a.deepEqual(c.merge([1,0,0],[0,2,0],0),[2,2,0]);a.equal(c.format([2,1,0]),'<2,1,0>');console.log('vector clock core tests: PASS');
+const c = require('./core.js');
+const assert = require('assert');
+assert.equal(c.compare([1, 0, 0], [1, 1, 0]), 'before');
+assert.equal(c.compare([1, 0, 1], [0, 1, 1]), 'concurrent');
+assert.equal(c.compare([2], [2, 0, 0]), 'same');
+assert.equal(c.happensBefore([0, 1], [0, 2]), true);
+const local = [1, 0, 0];
+assert.deepEqual(c.merge(local, [0, 2], 0), [2, 2, 0]);
+assert.deepEqual(local, [1, 0, 0]);
+assert.deepEqual(c.tick([0, 0], 1), [0, 1]);
+assert.equal(c.format([2, 1, 0]), '<2,1,0>');
+const event = c.makeEvent(1, [0, 1], 'test');
+assert.deepEqual(event.clock, [0, 1]);
+assert.equal(event.type, 'local');
+console.log('vector clock core tests: PASS (causality, unequal clocks, immutability)');
