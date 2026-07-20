@@ -1,0 +1,1 @@
+const c=require('./core.js');const a=require('assert');a.equal(c.compare([1,0,0],[1,1,0]),'before');a.equal(c.compare([1,0,1],[0,1,1]),'concurrent');a.deepEqual(c.merge([1,0,0],[0,2,0],0),[2,2,0]);a.equal(c.format([2,1,0]),'<2,1,0>');console.log('vector clock core tests: PASS');
