@@ -1,0 +1,1 @@
+const assert=require('node:assert/strict'),d=require('./src/js/date-utils');assert.equal(d.localDateKey(d.dateFromKey('2024-02-29')),'2024-02-29');assert.throws(()=>d.dateFromKey('2025-02-29'),/Invalid date key/);assert.equal(d.shiftMonth(2025,1,28).getDate(),28);console.log('OmniDate edge tests passed');
