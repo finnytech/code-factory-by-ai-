@@ -1,1 +1,12 @@
-const assert=require('node:assert/strict');const {localDateKey,dateFromKey,shiftMonth}=require('./src/js/date-utils');assert.equal(localDateKey(new Date(2026,6,20,23,59)),'2026-07-20');assert.equal(localDateKey('2026-07-20T00:30:00+02:00'),'2026-07-20');assert.deepEqual([dateFromKey('2026-02-28').getFullYear(),dateFromKey('2026-02-28').getMonth(),dateFromKey('2026-02-28').getDate()],[2026,1,28]);assert.throws(()=>dateFromKey('2026-02-30'),/Invalid date key/);assert.equal(shiftMonth(2026,0,15).getMonth(),0);console.log('OmniDate local calendar tests passed');
+const assert = require('node:assert/strict');
+const { localDateKey, dateFromKey, daysInMonth, shiftMonth } = require('./src/js/date-utils');
+assert.equal(localDateKey(dateFromKey('2024-02-29')), '2024-02-29');
+assert.throws(() => dateFromKey('2025-02-29'), /Invalid date key/);
+assert.equal(localDateKey(shiftMonth(2025, 1, 31)), '2025-02-28');
+assert.equal(localDateKey(shiftMonth(2024, 1, 31)), '2024-02-29');
+assert.equal(localDateKey(shiftMonth(2026, 3, 0)), '2026-04-01');
+assert.equal(daysInMonth(2024, 1), 29);
+assert.equal(daysInMonth(2025, 1), 28);
+assert.throws(() => shiftMonth(2025, 1, Number.NaN), /Invalid calendar date/);
+assert.throws(() => daysInMonth(2025.5, 1), /Invalid calendar month/);
+console.log('OmniDate local calendar tests passed');
